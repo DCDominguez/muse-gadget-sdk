@@ -16,6 +16,9 @@ limitations under the License.
 
 # Muse Gadgets
 
+> **This fork** adds an experimental port to the M5Stack Tab5 (ESP32-P4) on the
+> `tab5-port` branch: see [`tab5/`](tab5/README.md).
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/images/muse-gadgets-dark.png">

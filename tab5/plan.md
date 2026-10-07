@@ -19,7 +19,7 @@ git remote add upstream https://github.com/facebookincubator/muse-gadget-sdk.git
 git checkout -b tab5-port
 ```
 
-- Keep `plan.md` and `bringup-log.md` at the **repo root** (not inside `esp32/`).
+- Keep `plan.md` and `bringup-log.md` in `tab5/` (not inside `esp32/`), with the Tab5 tools in `tab5/tools/`.
 - Before the first build, check `.gitignore`. The SDK ignores generated `sdkconfig` files (where the token lives). Add flash backups (`tab5-backup.bin`, `*-backup.bin`) to `.gitignore`, or keep them outside the repo.
 - **Before every commit**, confirm no secrets are staged: `git diff --cached | grep -i mgst_` must return nothing. Also confirm no `sdkconfig`, `managed_components/`, `dependencies.lock` or `.bin` backups are staged.
 - Commit per gate on the `tab5-port` branch. Pull SDK updates with `git fetch upstream` and merge deliberately; do not rebase or force-push without asking.
@@ -79,7 +79,7 @@ git checkout -b tab5-port
 
 ### 1.0 Preflight (blocking; do in order, report findings before continuing)
 1. Identify the port and chip: `lsusb`, `python -m esptool chip-id`. Confirm `esp32p4`. Record the revision.
-2. **Back up stock flash** (16 MB) with `esptool read-flash`, store outside the repo, verify its size and hash, and tell the user where it is. On Windows, `tab5-preflight.ps1` (repo root) automates steps 1 and 2 read-only: chip check, flash check, MAC, backup read twice with SHA256 comparison, and a report. Review its output, and do not write anything to the board until it passes.
+2. **Back up stock flash** (16 MB) with `esptool read-flash`, store outside the repo, verify its size and hash, and tell the user where it is. On Windows, `tab5/tools/tab5-preflight.ps1` automates steps 1 and 2 read-only: chip check, flash check, MAC, backup read twice with SHA256 comparison, and a report. Review its output, and do not write anything to the board until it passes.
 3. Record the download-mode procedure from M5's docs. Confirm the board can recover through it before any write.
 4. Identify the display/touch revision (ILI9881C+GT911 vs ST7123/ST7121), using M5's demo repo `M5Tab5-UserDemo` and the I2C bus as evidence. Report which one this unit is.
 5. Query the C6 firmware version **read-only**. Report it. Do not write.
@@ -156,7 +156,7 @@ Advertise in `main/noise_control.cpp`, handle in `main/app.c`, async for anythin
 ---
 
 ## Agent working rules
-- One phase at a time; one subsystem per hardware step; log everything to a `bringup-log.md` (not committed secrets).
+- One phase at a time; one subsystem per hardware step; log everything to `tab5/bringup-log.md` (not committed secrets).
 - If hardware isn't attached for a step, say "built, not run."
 - Prefer vendor sources (M5Unified, M5Tab5-UserDemo, M5 docs, Espressif BSPs/esp_hosted) over memory for pins and registers; cite them.
 - Before handing back: build passes with size check, host tests pass, boot log shows `starting` with no panic or loop.
@@ -165,4 +165,4 @@ Advertise in `main/noise_control.cpp`, handle in `main/app.c`, async for anythin
 
 ## Kickoff prompt (first session)
 
-> Read `plan.md`, `esp32/AGENTS.md` and `esp32/devices/AGENTS.md`. Do only Phase 1.0 preflight, read-only: identify the chip, take and verify the flash backup, find the download-mode procedure, identify the display revision, and read the C6 firmware version without writing to it. Report findings and stop at Gate 1.0. Do not flash Muse firmware, write to the C6, or burn eFuses.
+> Read `tab5/plan.md`, `esp32/AGENTS.md` and `esp32/devices/AGENTS.md`. Do only Phase 1.0 preflight, read-only: identify the chip, take and verify the flash backup, find the download-mode procedure, identify the display revision, and read the C6 firmware version without writing to it. Report findings and stop at Gate 1.0. Do not flash Muse firmware, write to the C6, or burn eFuses.

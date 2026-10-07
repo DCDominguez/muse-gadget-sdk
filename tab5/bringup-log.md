@@ -67,3 +67,20 @@ requests); BSP 1.3.1 and esp_video on IDF 6.0.1; portrait layout of the Muse UI.
 - `tab5-muse-test2.bin` (merged, first flash, blanks NVS) SHA256
   `68ed98cc0268ede73c64834ab122c12297a9b5cf18f6cf57fd3a9d16b53df6bf`;
   `tab5-muse-test2-app-only.bin` for updates at 0x20000 (keeps pairing).
+
+### Kit 3 (2026-10-07): token put in on the owner's PC; `>log`
+
+- Builds carry a 48-character token placeholder; `tools/tab5_flash.py` swaps the owner's
+  token in, fixes the checksum and SHA-256, signs with the dev key and verifies. Tested
+  here: the placeholder round-trips byte for byte; a test token validates and its
+  signature verifies; the signed size matches the build's.
+- `>log` on the Muse console prints the log since boot (Windows misses the first seconds
+  after a reset).
+- Not yet run on the Tab5. The Windows scripts and the token form haven't run on Windows.
+
+### Housekeeping
+
+- Tab5 files moved to `tab5/` (this log, `plan.md`) and `tab5/tools/`; `README.md`,
+  `FLASHING.md` and `SDK-CHANGES.md` added. Kits are built with `tools/make_kit.sh` into
+  the gitignored `tab5/kits/`.
+- The Tab5 is listed in `esp32/AGENTS.md`, `esp32/README.md` and `esp32/devices/`.
