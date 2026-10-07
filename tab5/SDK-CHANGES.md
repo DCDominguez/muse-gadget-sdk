@@ -83,13 +83,43 @@ Ported from [wupsbr/waveshare-muse-gadget-sdk](https://github.com/wupsbr/wavesha
   `MBEDTLS_CERTIFICATE_BUNDLE_CROSS_SIGNED_VERIFY` for api.elevenlabs.io.
 - `tests/test_muse_chat_session.py`: theirs.
 
+## Reactions (from wupsbr/waveshare-muse-gadget-sdk)
+
+Their commits `1e91a29`, `eaacdae`, `4e3d679` and `090a83f` (Apache-2.0),
+firmware only: dizzy when shaken, drowsing with a snore before auto-sleep,
+waking, tickle (a rub or a flurry of taps), and the touch-drag volume that
+tickle builds on. Every board with the full UI gets drowsing, waking and
+tickle; shaking needs an accelerometer.
+
+- `muse_imu.*`: theirs (QMI8658), plus `muse_imu_use()`, which takes a board's
+  own reader. The Tab5 hands it the BMI270 through Espressif's `bmi270`
+  driver (0x68, +-8 g, 200 Hz).
+- `muse_ui.c`: the volume drag and tickle start only on Muse's tiles, not on a
+  dock beside them.
+- `esp32/avatar/muse_pixel.c`: their Jollybot drawings of the reactions, in a
+  commit of their own; not Apache-licensed (`esp32/avatar/REACTIONS-NOTICE.md`).
+
+## Commands Muse can use
+
+- `voice.configure` is answered on every Muse board (it was the Voice PE
+  board's): it sets the volume in Muse's settings (`main/muse_glue.c`), so the
+  face, Settings and the Tab5 dock follow.
+- `camera.capture` is board-neutral: `CONFIG_MUSE_CAMERA_CAPTURE`, on with the
+  Watcher's camera or the Tab5's. Boards other than the Watcher answer through
+  the camera component's new `camera_capture_base64()`. The Tab5's driver
+  (`boards/tab5_camera.c`) starts the SC202CS through the BSP and esp_video,
+  lets auto exposure settle for 20 frames, then scales and turns the frame with
+  the PPA and encodes it with the P4's JPEG engine: 640x352.
+  `CONFIG_MUSE_TAB5_CAMERA_ROTATION` (180) turns it upright; Flip adds 180. The
+  overlay sets `CONFIG_CAMERA_SC202CS` and the ISP pipeline controller.
+
 ## Simulator
 
 `esp32/simulator` compiles `muse_dock.c` (it no longer linked after
 `muse_ui.c` began calling `muse_dock_build()`), with stubs for its services.
 `--board tab5` renders the Tab5 layout; `tap=`, `keyboard=` and `type=`
 scenario keys and `tests/scenarios_tab5/` cover the dock's chat and on-screen
-keyboard. The Watcher profile and its tests are unchanged.
+keyboard. `react=dizzy|drowse|wake|tickle` starts a reaction. The Watcher profile and its tests are unchanged.
 
 ## Docs
 

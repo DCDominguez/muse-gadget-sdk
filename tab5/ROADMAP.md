@@ -41,13 +41,15 @@ is Meta's character, and they say so. Bringing those drawings over carries the
 same status; keep them in a separate commit, as they did.
 
 **Order:** spoken replies, then all messages (with the dock showing pushes and
-app-typed turns), then reactions on the BMI270.
+app-typed turns), then reactions on the BMI270. All three are ported.
 
 **Status:** spoken replies and All messages are ported (`SDK-CHANGES.md`),
 with the ElevenLabs key patched in by the flashing kit. A free alternative,
 a Kokoro server on the owner's PC set with `>tts=` ([`KOKORO.md`](KOKORO.md)),
 is used before ElevenLabs. Neither is tried on the Tab5 yet. Pushes play through the voice path, so the dock shows them as spoken
-replies. Reactions are next.
+replies. Reactions (dizzy on the BMI270, drowsing with a snore, waking,
+tickle, touch-drag volume) are ported too, with their drawings in a separate,
+non-Apache commit. None of this is tried on the Tab5 yet: `TESTING.md`.
 
 ## 3. Voice quality on the Tab5
 
@@ -61,7 +63,15 @@ After the reactions in 2: new animations on the existing avatar, and options
 to customize it (`tools/muse/avatar.py` already builds a custom avatar from
 Muse). Design to come.
 
-## 5. Later
+## 5. Every SDK command
 
-Camera (`camera.capture` on the Tab5's CSI camera, see `NEXT-STEPS.md`), IMU
-and RTC tools, emoji in the chat, light sleep.
+Muse can call seven commands. On the Tab5: `device.health`, `device.discover`
+(tunnel), `display.draw_url`, `display.show_animation`, `device.ota`, and now
+`voice.configure` and `camera.capture`. `sensors.read` is the SenseCAP
+Indicator's air sensors, which the Tab5 lacks. `TESTING.md` covers each.
+
+## 6. Later
+
+The RTC (RX8130; the BSP has no driver), the SD card, light sleep
+(`display_pause`, `panel_sleep`), emoji in the chat, a live camera view on the
+screen.

@@ -64,18 +64,10 @@ a `kokoro` container):
    `python -c "import serial,time; s=serial.Serial('COM4',115200,timeout=1); s.write(b'>tts=http://<IP>:8880\n'); time.sleep(1.5); print(s.read(4096).decode('utf-8','replace'))"`
    It should print `@tts {"url":"http://<IP>:8880","voice":"af_heart"}`.
 
-## Then ask me to check on the screen
-Muse face on the left, status and chat on the right, talk button and controls
-at the bottom; taps land where I touch (if not: the Flip button); battery shows
-about 6.0-8.4 V; the keyboard line changes when I plug the Tab5 Keyboard in;
-typed text appears in the chat box; Sleep then a touch wakes it. New in this
-build, also ask me to try:
-- Tap the chat line with the keyboard unplugged: an on-screen keyboard opens
-  over the bottom strip.
-- Ask Muse a question with Kokoro set: the reply is spoken. Then send `>log`
-  (as in step 3, with `b'>log\n'` and a longer read) and report the `speech:`
-  lines.
-- Ask Muse to show a picture: it appears in the face area.
-- Ask Muse to reach a device on the home network (the tunnel).
-- Settings → All messages on, then type to Muse in the Muse app: the reply
-  appears on the Tab5.
+## Then walk me through the tests
+`TESTING.md` in this kit lists every feature, how to try it and the log line
+that shows it worked. Go through it with me section by section: tell me what to
+do, read the serial log (`>log`, sent as in the Kokoro step 3 with `b'>log\n'`
+and a longer read) and record pass, fail or skip for each test. For each fail,
+keep the log lines around it, with any `SDK token:` line redacted. At the end,
+give me the table of results.

@@ -43,6 +43,12 @@ isn't part of the upstream SDK; upstream pull requests need Meta's CLA (see
   picture 180° and remembers it. Hold **Off** for 1.5 s to power off (on
   battery; on USB the Tab5 stays on).
 - **Battery** voltage, percentage and charging, from the Tab5's INA226.
+- **Reactions:** shake the Tab5 and Muse gets dizzy; rub or tap its face
+  quickly and it giggles; before auto-sleep it yawns and snores; drag up or
+  down on it for volume.
+- **Muse's commands:** pictures on screen, the home-network tunnel, OTA,
+  volume (`voice.configure`) and photos from the Tab5's camera
+  (`camera.capture`).
 - **Spoken replies**, free with [Kokoro](KOKORO.md) on your PC or with an
   ElevenLabs key, and **All messages** (Settings,
   off by default): messages Muse sends first, and replies to what you type in
@@ -88,6 +94,7 @@ in with the offline form, and flash with `tools/tab5-flash.ps1` (or hand
 | [`plan.md`](plan.md) | The three-phase plan, its gates and safety rules |
 | [`bringup-log.md`](bringup-log.md) | What was found and done, step by step |
 | [`FLASHING.md`](FLASHING.md) | Backup, kit, token, flash, boot log, rollback |
+| [`TESTING.md`](TESTING.md) | Every feature, how to try it, what the log says |
 | [`KOKORO.md`](KOKORO.md) | Free spoken replies from a Kokoro server on your PC |
 | [`ROADMAP.md`](ROADMAP.md) | What comes next: feature checks, voice and message sync, avatar |
 | [`SDK-CHANGES.md`](SDK-CHANGES.md) | What the port changed outside its own board file |
@@ -118,5 +125,6 @@ overlay `devices/sdkconfig.muse-m5stack-tab5`, and the dock
 6. **Sleep** is backlight-off only; the P4 doesn't light-sleep yet.
 7. Five Wi-Fi tuning options in the shared `sdkconfig.muse` don't apply under
    `esp_wifi_remote`.
-8. Not started: camera, IMU and RTC as Muse tools; avatar reactions; OTA tested
-   end to end.
+8. Built, not yet tried on the Tab5: the camera (`camera.capture`), the
+   reactions (shake needs the BMI270), `voice.configure`, OTA end to end.
+   Not started: the RTC, the SD card. See [TESTING.md](TESTING.md).

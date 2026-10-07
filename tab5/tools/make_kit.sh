@@ -78,7 +78,7 @@ rm -rf "$kit" && mkdir -p "$kit"
 cp "$B/muse-gadget-unsigned.bin" "$kit/tab5-muse-app-unsigned.bin"
 cp dev_signing_key.pem "$kit/"
 cp "$here/tab5_flash.py" "$here/tab5-flash.ps1" "$here/tab5-sdk-token.html" "$here/CODEX_PROMPT.md" "$kit/"
-cp "$repo/tab5/KOKORO.md" "$kit/"
+cp "$repo/tab5/KOKORO.md" "$repo/tab5/TESTING.md" "$kit/"
 cat > "$kit/README.md" <<EOF
 # Muse for M5Stack Tab5: kit $name ($(git -C "$repo" rev-parse --short HEAD))
 
@@ -89,11 +89,12 @@ cat > "$kit/README.md" <<EOF
    Later: drop \`-First\` (app only; keeps pairing and Wi-Fi).
 3. Or give Codex \`CODEX_PROMPT.md\`.
 4. Free spoken replies from your PC: \`KOKORO.md\`.
+5. What to test, and what the log says: \`TESTING.md\`.
 
 See tab5/FLASHING.md in DCDominguez/muse-gadget-sdk (branch tab5-port).
 EOF
 (cd "$kit" && sha256sum tab5-muse-base.bin tab5-muse-app-unsigned.bin dev_signing_key.pem \
-    tab5_flash.py tab5-flash.ps1 tab5-sdk-token.html CODEX_PROMPT.md KOKORO.md > SHA256SUMS.txt)
+    tab5_flash.py tab5-flash.ps1 tab5-sdk-token.html CODEX_PROMPT.md KOKORO.md TESTING.md > SHA256SUMS.txt)
 (cd "$kit" && python3 -I -c "import sys; sys.path.insert(0, '.'); sys.argv = ['x']
 import tab5_flash as t; t.check_kit(); assert bytes(t.patch(t.PLACEHOLDER, t.KEY_PLACEHOLDER)) == open(t.APP, 'rb').read()" \
     && rm -rf __pycache__)
