@@ -82,6 +82,7 @@ in with the offline form, and flash with `tools/tab5-flash.ps1` (or hand
 | [`plan.md`](plan.md) | The three-phase plan, its gates and safety rules |
 | [`bringup-log.md`](bringup-log.md) | What was found and done, step by step |
 | [`FLASHING.md`](FLASHING.md) | Backup, kit, token, flash, boot log, rollback |
+| [`ROADMAP.md`](ROADMAP.md) | What comes next: feature checks, voice and message sync, avatar |
 | [`SDK-CHANGES.md`](SDK-CHANGES.md) | What the port changed outside its own board file |
 | `tools/tab5-preflight.ps1` | Read-only chip check and verified 16 MB flash backup (Windows) |
 | `tools/make_kit.sh` | Builds a flashing kit with a token placeholder |
