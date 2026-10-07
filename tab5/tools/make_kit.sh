@@ -44,12 +44,18 @@ command -v idf.py >/dev/null 2>&1 || { echo "idf.py not found; activate ESP-IDF 
 placeholder="mgst_TAB5LOCALPLACEHOLDER0000000000000000000000A"
 [ ${#placeholder} -eq 48 ] || { echo "placeholder length" >&2; exit 1; }
 (cd "$here" && python3 -I -c "import sys; sys.path.insert(0, '.'); import tab5_flash as t
-sys.exit(t.PLACEHOLDER.decode() != sys.argv[1])" "$placeholder") ||
+sys.exit(t.PLACEHOLDER.decode() != sys.argv[1] or t.KEY_PLACEHOLDER.decode() != sys.argv[2])" \
+    "$placeholder" "$key_placeholder") ||
     { echo "tab5_flash.py's placeholder changed; update make_kit.sh" >&2; exit 1; }
 rm -rf "$here/__pycache__"
 defaults=$(mktemp)
 trap 'rm -f "$defaults"' EXIT
-printf 'CONFIG_GADGET_SDK_TOKEN="%s"\n' "$placeholder" > "$defaults"
+# The ElevenLabs key's placeholder (KEY_PLACEHOLDER in tab5_flash.py): 64
+# bytes, so the owner's key or zeros fit in place.
+key_placeholder="elk_TAB5LOCALPLACEHOLDER0000000000000000000000000000000000000000"
+[ ${#key_placeholder} -eq 64 ] || { echo "key placeholder length" >&2; exit 1; }
+printf 'CONFIG_GADGET_SDK_TOKEN="%s"\nCONFIG_MUSE_ELEVENLABS_API_KEY="%s"\n' \
+    "$placeholder" "$key_placeholder" > "$defaults"
 
 cd "$esp"
 rm -rf "$B" managed_components dependencies.lock
@@ -58,10 +64,13 @@ ver_arg=()
 idf.py -B "$B" -DIDF_TARGET=esp32p4 -DSDKCONFIG="$B/sdkconfig" "${ver_arg[@]}" \
     -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-tab5;$defaults" \
     build | tail -3
-python3 - "$B/muse-gadget-unsigned.bin" "$placeholder" <<'EOF'
+python3 - "$B/muse-gadget-unsigned.bin" "$placeholder" "$key_placeholder" <<'EOF'
 import sys
-n = open(sys.argv[1], 'rb').read().count(sys.argv[2].encode())
-sys.exit(0 if n == 1 else f"expected one token placeholder in the app, found {n}")
+img = open(sys.argv[1], 'rb').read()
+for p in sys.argv[2:]:
+    n = img.count(p.encode())
+    if n != 1:
+        sys.exit(f"expected one {p[:4]} placeholder in the app, found {n}")
 EOF
 
 rm -rf "$kit" && mkdir -p "$kit"
@@ -73,7 +82,8 @@ cat > "$kit/README.md" <<EOF
 # Muse for M5Stack Tab5: kit $name ($(git -C "$repo" rev-parse --short HEAD))
 
 1. Open \`tab5-sdk-token.html\` in your browser (offline; sends nothing). Paste
-   your SDK token and save \`tab5-sdk-token.txt\` here or in Downloads.
+   your SDK token and save \`tab5-sdk-token.txt\` here or in Downloads. For
+   spoken replies, also save your ElevenLabs key as \`tab5-elevenlabs-key.txt\`.
 2. First flash over other firmware: \`.\\tab5-flash.ps1 -Port COM4 -First\`.
    Later: drop \`-First\` (app only; keeps pairing and Wi-Fi).
 3. Or give Codex \`CODEX_PROMPT.md\`.

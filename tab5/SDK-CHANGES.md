@@ -58,6 +58,26 @@ other boards share, with why and what they do elsewhere. Upstream is
   (`espressif/m5stack_tab5` 1.3.1, keyed on `MUSE_BOARD_ID`) as for any board.
 - `tools/muse/board.sh`, `ports.py`, `avatar.py`: the `tab5` alias.
 
+## Spoken replies and All messages (from wupsbr/waveshare-muse-gadget-sdk)
+
+Ported from [wupsbr/waveshare-muse-gadget-sdk](https://github.com/wupsbr/waveshare-muse-gadget-sdk)
+(Apache-2.0), which forks the same upstream commit; see its
+`docs/CHANGES-FROM-UPSTREAM.md`, changes 4, 5 and 10.
+
+- `muse_chat_session.cpp`: theirs as is, plus one change: the ElevenLabs key
+  is read through a volatile pointer (`elevenlabs_key()`), so a key written
+  into the image after the build (the flashing kit) takes effect.
+- `muse_chat.h`, `muse_voice.c`: pushes (`muse_hatch_push_take/drop`,
+  `play_push`). The snore and other reaction changes are not ported yet.
+  `muse_chat_link.c` (boards without PSRAM) gets no-op push functions, which
+  the fork didn't need since it builds no such board.
+- `muse_settings.*`, `muse_settings_ui.c`: the **All messages** switch (off by
+  default, NVS `pushes`) and the volume slider following changes made
+  elsewhere. Their simpler Battery page is not ported.
+- `Kconfig`: `MUSE_ELEVENLABS_API_KEY`, `_VOICE_ID`, `_MODEL`. Tab5 overlay:
+  `MBEDTLS_CERTIFICATE_BUNDLE_CROSS_SIGNED_VERIFY` for api.elevenlabs.io.
+- `tests/test_muse_chat_session.py`: theirs.
+
 ## Simulator
 
 `esp32/simulator` compiles `muse_dock.c` (it no longer linked after

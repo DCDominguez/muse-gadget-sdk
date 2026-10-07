@@ -48,6 +48,10 @@ import time
 KIT = os.path.dirname(os.path.abspath(__file__))
 PLACEHOLDER = b"mgst_TAB5LOCALPLACEHOLDER" + b"0" * 22 + b"A"
 TOKEN_RE = re.compile(r"^mgst_[A-Za-z0-9_-]*[AEIMQUYcgkosw048]$")
+# CONFIG_MUSE_ELEVENLABS_API_KEY in kits (spoken replies): 64 bytes, room for
+# a key and its terminator. No key: zeros, and replies stay text.
+KEY_PLACEHOLDER = b"elk_TAB5LOCALPLACEHOLDER" + b"0" * 40
+KEY_RE = re.compile(r"^[A-Za-z0-9_-]{20,63}$")
 MERGED = "tab5-muse-base.bin"
 APP = "tab5-muse-app-unsigned.bin"
 KEY = "dev_signing_key.pem"
@@ -97,6 +101,18 @@ def read_token(path):
     return token.encode()
 
 
+def read_key(path):
+    """The ElevenLabs key: from its file, else stdin's second line; empty for none."""
+    if path:
+        with open(path, encoding="utf-8") as f:
+            key = f.read().strip()
+    else:
+        key = sys.stdin.readline().strip()
+    if key and not KEY_RE.match(key):
+        die("that doesn't look like an ElevenLabs API key; copy it again from elevenlabs.io")
+    return key.encode()
+
+
 def check_board(port, mac):
     out = esptool("--chip", "esp32p4", "-p", port, "chip-id", capture=True)
     if "ESP32-P4" not in out:
@@ -130,10 +146,12 @@ def segments_end(img):
     return off + (15 - off % 16)
 
 
-def patch(token):
+def patch(token, key=b""):
     img = bytearray(open(os.path.join(KIT, APP), "rb").read())
     if img.count(PLACEHOLDER) != 1:
         die("app image doesn't hold exactly one token placeholder")
+    if img.count(KEY_PLACEHOLDER) > 1:
+        die("app image holds more than one ElevenLabs key placeholder")
     ck = segments_end(img)
     # Self-check against the image as built before changing anything.
     xor = 0xEF
@@ -141,10 +159,16 @@ def patch(token):
         xor ^= b
     if img[ck] != xor or hashlib.sha256(img[:ck + 1]).digest() != bytes(img[ck + 1:ck + 33]):
         die("app image checksum or hash doesn't verify as shipped")
-    at = img.index(PLACEHOLDER)
-    for old, new in zip(PLACEHOLDER, token):
-        img[ck] ^= old ^ new          # the checksum is an XOR over segment data
-    img[at:at + len(token)] = token
+    swaps = [(PLACEHOLDER, token)]
+    if KEY_PLACEHOLDER in img:     # kits built since spoken replies
+        swaps.append((KEY_PLACEHOLDER, key.ljust(len(KEY_PLACEHOLDER), b"\0")))
+    elif key:
+        die("this kit has no spoken replies; drop the ElevenLabs key or use a newer kit")
+    for old_bytes, new_bytes in swaps:
+        at = img.index(old_bytes)
+        for old, new in zip(old_bytes, new_bytes):
+            img[ck] ^= old ^ new      # the checksum is an XOR over segment data
+        img[at:at + len(new_bytes)] = new_bytes
     img[ck + 1:ck + 33] = hashlib.sha256(img[:ck + 1]).digest()
     return img
 
@@ -172,7 +196,7 @@ def sign(img, work):
                        capture_output=True, text=True)
     if r.returncode or "(valid)" not in r.stdout:
         die("the patched image doesn't validate")
-    print("app: token in, checksum, hash and signature verified")
+    print("app: secrets in, checksum, hash and signature verified")
     return unsigned, signed
 
 
@@ -217,6 +241,8 @@ def main():
     ap.add_argument("--mac", default="80:f1:b2:d1:44:7d")
     ap.add_argument("--backups", default=os.path.join(os.path.expanduser("~"), "tab5-backups"))
     ap.add_argument("--token-file", help="read the token from this file and delete it afterwards")
+    ap.add_argument("--key-file", help="ElevenLabs API key for spoken replies, from this file (deleted "
+                    "afterwards); without it, a second stdin line, or none")
     ap.add_argument("--baud", default="460800")
     ap.add_argument("--log-secs", type=int, default=60)
     ap.add_argument("--log", default=os.path.join(KIT, "tab5-boot.log"))
@@ -224,11 +250,12 @@ def main():
 
     check_kit()
     token = read_token(a.token_file)
+    key = read_key(a.key_file) if a.key_file or not a.token_file else b""
     if a.ota_out:
         work = tempfile.mkdtemp(prefix="tab5-")
         unsigned = signed = ""
         try:
-            unsigned, signed = sign(patch(token), work)
+            unsigned, signed = sign(patch(token, key), work)
             with open(signed, "rb") as src, open(a.ota_out, "wb") as dst:
                 dst.write(src.read())
         finally:
@@ -238,8 +265,9 @@ def main():
                 os.rmdir(work)
             except OSError:
                 pass
-            if a.token_file:
-                scrub(a.token_file)
+            for path in (a.token_file, a.key_file):
+                if path:
+                    scrub(path)
         print(f"OTA image: {a.ota_out}. It holds your SDK token: host it privately, over HTTPS.")
         return
     if not a.port:
@@ -249,9 +277,9 @@ def main():
     work = tempfile.mkdtemp(prefix="tab5-")
     unsigned = signed = ""
     try:
-        img = patch(token)
+        img = patch(token, key)
         unsigned, signed = sign(img, work)
-        del img, token
+        del img, token, key
         common = ["--chip", "esp32p4", "-p", a.port, "-b", a.baud]
         if a.first:
             esptool(*common, "--after", "no-reset", "erase-region", hex(PROD_DATA[0]), hex(PROD_DATA[1]))
@@ -264,8 +292,9 @@ def main():
             os.rmdir(work)
         except OSError:
             pass
-        if a.token_file:
-            scrub(a.token_file)
+        for path in (a.token_file, a.key_file):
+            if path:
+                scrub(path)
     print("flashed. The token file and patched image are gone.")
     capture(a.port, a.log_secs, a.log)
 

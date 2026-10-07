@@ -810,6 +810,16 @@ const char *muse_hatch_state_name(muse_hatch_state_t state)
     return "";
 }
 
+/* Pushes need the full session (muse_chat_session.cpp); Link's has none. */
+bool muse_hatch_push_take(void)
+{
+    return false;
+}
+
+void muse_hatch_push_drop(void)
+{
+}
+
 bool muse_hatch_ready(void)
 {
     return s_events && muse_link_hatch_linked() && muse_wifi_connected() && muse_link_req_ready();

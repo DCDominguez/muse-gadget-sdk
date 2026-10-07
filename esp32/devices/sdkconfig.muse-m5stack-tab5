@@ -86,3 +86,8 @@ CONFIG_LVGL_PORT_ENABLE_PPA=y
 # image_fetch.c's JPEG decoder comes from esp_jpeg (the P4's ROM has none).
 # Basic decoding keeps the 3100-byte work pool the ROM decoder uses.
 CONFIG_JD_FASTDECODE_BASIC=y
+
+# Spoken replies (MUSE_ELEVENLABS_API_KEY): api.elevenlabs.io presents GTS
+# Root R1 cross-signed by GlobalSign Root CA, which IDF's bundle no longer
+# carries on its own (wupsbr/waveshare-muse-gadget-sdk, change 10).
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_CROSS_SIGNED_VERIFY=y

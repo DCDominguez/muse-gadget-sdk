@@ -43,6 +43,12 @@
     </div>
     <div id="msg"></div>
     <button class="primary" id="save" type="button" disabled>Save tab5-sdk-token.txt</button>
+    <label for="elk" style="margin-top:24px">Optional, for spoken replies: ElevenLabs API key (elevenlabs.io → Developers → API keys, with Text to Speech)</label>
+    <div class="row">
+      <input id="elk" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk_…">
+    </div>
+    <div id="elkmsg"></div>
+    <button class="primary" id="saveelk" type="button" disabled>Save tab5-elevenlabs-key.txt</button>
     <ol>
       <li>Save the file into the kit folder (next to <code>tab5-flash.ps1</code>), or leave it in Downloads.</li>
       <li>Run the flash (or let Codex run it). The script reads the file, flashes, then deletes it.</li>
@@ -62,6 +68,23 @@
       'Not a valid SDK token: it is 48 characters and starts with mgst_. Copy it again.';
   }
   key.addEventListener('input', check);
+  const elk = document.getElementById('elk'), elkmsg = document.getElementById('elkmsg'), saveelk = document.getElementById('saveelk');
+  const KRE = /^[A-Za-z0-9_-]{20,63}$/;
+  elk.addEventListener('input', () => {
+    const v = elk.value.trim(), ok = KRE.test(v);
+    saveelk.disabled = !ok;
+    elkmsg.className = v ? (ok ? 'ok' : 'bad') : '';
+    elkmsg.textContent = !v ? '' : ok ? 'Looks like an API key.' : 'That doesn\'t look like an ElevenLabs API key.';
+  });
+  saveelk.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([elk.value.trim() + '\n'], { type: 'text/plain' }));
+    a.download = 'tab5-elevenlabs-key.txt';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    elk.value = ''; saveelk.disabled = true;
+    elkmsg.className = 'ok'; elkmsg.textContent = 'Saved. The field is cleared.';
+  });
   document.getElementById('show').addEventListener('click', e => {
     key.type = key.type === 'password' ? 'text' : 'password';
     e.target.textContent = key.type === 'password' ? 'Show' : 'Hide';

@@ -43,6 +43,11 @@ same status; keep them in a separate commit, as they did.
 **Order:** spoken replies, then all messages (with the dock showing pushes and
 app-typed turns), then reactions on the BMI270.
 
+**Status:** spoken replies and All messages are ported (`SDK-CHANGES.md`),
+with the ElevenLabs key patched in by the flashing kit; not yet tried on the
+Tab5. Pushes play through the voice path, so the dock shows them as spoken
+replies. Reactions are next.
+
 ## 3. Voice quality on the Tab5
 
 - ES7210 mic slots and echo: today both slots are mixed (`mic_slot = -1`).

@@ -50,6 +50,12 @@ Get it from gadgets.muse.ai → Account → SDK tokens. Then either:
   anywhere; or
 - skip it, and `tab5-flash.ps1` opens a masked Windows dialog during the flash.
 
+**Spoken replies (optional).** Muse's replies are text; the Tab5 speaks them
+with ElevenLabs if the firmware has your ElevenLabs API key (with the Text to
+Speech permission). The form's second field saves it as
+`tab5-elevenlabs-key.txt`; the dialog has a second field too. It's patched in
+like the token. Without it, replies stay text.
+
 The token reaches `tab5_flash.py` on stdin or as that file, never on a command
 line. It is never printed (the firmware itself logs its first 12 characters as
 a hint). The patched image and the token file are overwritten and deleted after

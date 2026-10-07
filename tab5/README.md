@@ -43,6 +43,11 @@ isn't part of the upstream SDK; upstream pull requests need Meta's CLA (see
   picture 180° and remembers it. Hold **Off** for 1.5 s to power off (on
   battery; on USB the Tab5 stays on).
 - **Battery** voltage, percentage and charging, from the Tab5's INA226.
+- **Spoken replies** with an ElevenLabs key, and **All messages** (Settings,
+  off by default): messages Muse sends first, and replies to what you type in
+  the Muse app, appear and are spoken on the Tab5. Both come from
+  [wupsbr/waveshare-muse-gadget-sdk](https://github.com/wupsbr/waveshare-muse-gadget-sdk);
+  not yet tried on the Tab5.
 
 ## Hardware notes
 

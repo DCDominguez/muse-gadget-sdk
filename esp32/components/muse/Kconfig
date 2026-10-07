@@ -129,6 +129,33 @@ menu "Muse"
         range 0 100
         default 70
 
+    config MUSE_ELEVENLABS_API_KEY
+        string "ElevenLabs API key for spoken replies"
+        depends on MUSE_HATCH
+        default ""
+        help
+            With a key, start_tts sends each reply's text to ElevenLabs'
+            streaming text-to-speech and plays the MP3 it returns, captions
+            following the speech. The key needs the Text to Speech
+            permission. Empty: replies stay text. Like the SDK token, the key
+            ships inside the firmware: never commit a generated sdkconfig.
+
+    config MUSE_ELEVENLABS_VOICE_ID
+        string "ElevenLabs voice ID"
+        depends on MUSE_HATCH
+        default "EXAVITQu4vr4xnSDxMaL"
+        help
+            Any voice in the account's library. The default is the premade
+            "Sarah".
+
+    config MUSE_ELEVENLABS_MODEL
+        string "ElevenLabs model"
+        depends on MUSE_HATCH
+        default "eleven_flash_v2_5"
+        help
+            eleven_flash_v2_5 answers fastest and speaks 32 languages;
+            eleven_multilingual_v2 sounds richer but starts later.
+
     config MUSE_TAB5_ROTATE_270
         bool "M5Stack Tab5: landscape the other way up"
         depends on MUSE_BOARD_M5STACK_TAB5

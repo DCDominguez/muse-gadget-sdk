@@ -4,8 +4,9 @@ You're on my Windows PC. The Tab5 is on **COM4**. This folder is the flashing
 kit. Do only what's below. Do not edit, rebuild or "fix" the firmware, and do
 not improvise around a failure: stop and report it.
 
-## The SDK token is secret
-- Never ask me for it, read it, print it, copy it, or open `tab5-sdk-token.txt`.
+## The SDK token and the ElevenLabs key are secret
+- Never ask me for them, read them, print them, copy them, or open
+  `tab5-sdk-token.txt` or `tab5-elevenlabs-key.txt`.
 - `tab5-flash.ps1` handles it. If a window titled "Muse SDK key for the Tab5"
   appears, that's for me: wait for me to fill it in.
 - When you quote the log, redact the line containing `SDK token:`.
