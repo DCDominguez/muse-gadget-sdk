@@ -29,5 +29,11 @@ if(NOT CMAKE_SOURCE_DIR STREQUAL GADGET_SOURCE_DIR)
     )
 endif()
 
+# ESP32-P4 builds (M5Stack Tab5) take patched copies of a few managed
+# components; see components_p4/README.md.
+if(IDF_TARGET STREQUAL "esp32p4" OR "$ENV{IDF_TARGET}" STREQUAL "esp32p4")
+    list(APPEND EXTRA_COMPONENT_DIRS "${GADGET_SOURCE_DIR}/components_p4")
+endif()
+
 # ESP-IDF reads version.txt from the active project root unless PROJECT_VER is set.
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)

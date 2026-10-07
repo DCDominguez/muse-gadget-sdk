@@ -77,3 +77,7 @@ CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=y
 CONFIG_BSP_LCD_DRAW_BUF_HEIGHT=50
 CONFIG_BSP_LCD_DRAW_BUF_DOUBLE=y
 CONFIG_LVGL_PORT_ENABLE_PPA=y
+
+# image_fetch.c's JPEG decoder comes from esp_jpeg (the P4's ROM has none).
+# Basic decoding keeps the 3100-byte work pool the ROM decoder uses.
+CONFIG_JD_FASTDECODE_BASIC=y
