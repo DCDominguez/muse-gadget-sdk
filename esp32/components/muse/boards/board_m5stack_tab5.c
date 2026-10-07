@@ -17,7 +17,7 @@
 /*
  * M5Stack Tab5 (ESP32-P4). Pin map, IO expanders, LCD, touch and codecs come
  * from Espressif's BSP: https://github.com/espressif/esp-bsp/tree/master/bsp/m5stack_tab5
- * 5" 720x1280 MIPI-DSI LCD in three revisions (ILI9881C + GT911, ST7123 or
+ * 5" 720x1280 MIPI-DSI LCD, run landscape (1280x720), in three revisions (ILI9881C + GT911, ST7123 or
  * ST7121 with built-in touch), which the BSP tells apart at start by probing
  * the touch controller. ES8388 speaker codec and ES7210 microphones. Two
  * PI4IOE5V6408 expanders (0x43, 0x44) switch the LCD, touch, speaker, USB and
@@ -71,14 +71,15 @@ static lv_display_t *display_start(lv_indev_t **touch)
     }
     vTaskDelay(pdMS_TO_TICKS(500));
 
-    /* Native portrait, no rotation: rotating a 1280x720 frame in software
-     * would cost most of a core. Draw buffers in PSRAM, which the DSI DMA
-     * reads directly. */
+    /* The panel is 720x1280 portrait; Muse runs it landscape for a keyboard.
+     * esp_lvgl_port rotates each flush with the P4's PPA when sw_rotate is
+     * set and CONFIG_LVGL_PORT_ENABLE_PPA is on, so it costs no CPU. Buffers
+     * as the BSP's own bsp_display_start(): internal DMA RAM. */
     bsp_display_cfg_t cfg = {
         .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
         .buffer_size = BSP_LCD_H_RES * CONFIG_BSP_LCD_DRAW_BUF_HEIGHT,
         .double_buffer = true,
-        .flags = { .buff_dma = false, .buff_spiram = true, .sw_rotate = false },
+        .flags = { .buff_dma = true, .buff_spiram = false, .sw_rotate = true },
     };
     cfg.lvgl_port_cfg.task_affinity = MUSE_UI_CORE;
     cfg.lvgl_port_cfg.task_priority = MUSE_UI_PRIORITY;
@@ -86,6 +87,10 @@ static lv_display_t *display_start(lv_indev_t **touch)
     if (!disp) {
         return NULL;
     }
+    /* 90 degrees, as Cartographer runs this Tab5; touch follows the display. */
+    bsp_display_lock(0);
+    bsp_display_rotate(disp, LV_DISPLAY_ROTATION_90);
+    bsp_display_unlock();
     *touch = bsp_display_get_input_dev();
     return *touch ? disp : NULL;
 }
@@ -158,8 +163,8 @@ static esp_err_t power_off(void)
 
 static const muse_board_t s_board = {
     .name = "M5Stack Tab5",
-    .width = BSP_LCD_H_RES,
-    .height = BSP_LCD_V_RES,
+    .width = BSP_LCD_V_RES,     /* landscape: 1280 */
+    .height = BSP_LCD_H_RES,    /* 720 */
     .avatar_px = 480,
     .round = false,
     .touch = true,

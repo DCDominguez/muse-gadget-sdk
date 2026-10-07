@@ -72,6 +72,8 @@ CONFIG_BT_CONTROLLER_DISABLED=y
 CONFIG_BT_NIMBLE_TRANSPORT_UART=n
 CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=y
 
-# LVGL draw buffers: the BSP's default 50 lines, twice, in PSRAM.
+# LVGL draw buffers: the BSP's default 50 lines, twice. Landscape: the P4's
+# PPA rotates each flush in hardware.
 CONFIG_BSP_LCD_DRAW_BUF_HEIGHT=50
 CONFIG_BSP_LCD_DRAW_BUF_DOUBLE=y
+CONFIG_LVGL_PORT_ENABLE_PPA=y
