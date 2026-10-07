@@ -43,6 +43,10 @@ command -v idf.py >/dev/null 2>&1 || { echo "idf.py not found; activate ESP-IDF 
 # Must match PLACEHOLDER in tab5_flash.py: 48 characters, valid token form.
 placeholder="mgst_TAB5LOCALPLACEHOLDER0000000000000000000000A"
 [ ${#placeholder} -eq 48 ] || { echo "placeholder length" >&2; exit 1; }
+# The ElevenLabs key's placeholder (KEY_PLACEHOLDER in tab5_flash.py): 64
+# bytes, so the owner's key or zeros fit in place.
+key_placeholder="elk_TAB5LOCALPLACEHOLDER0000000000000000000000000000000000000000"
+[ ${#key_placeholder} -eq 64 ] || { echo "key placeholder length" >&2; exit 1; }
 (cd "$here" && python3 -I -c "import sys; sys.path.insert(0, '.'); import tab5_flash as t
 sys.exit(t.PLACEHOLDER.decode() != sys.argv[1] or t.KEY_PLACEHOLDER.decode() != sys.argv[2])" \
     "$placeholder" "$key_placeholder") ||
@@ -50,10 +54,6 @@ sys.exit(t.PLACEHOLDER.decode() != sys.argv[1] or t.KEY_PLACEHOLDER.decode() != 
 rm -rf "$here/__pycache__"
 defaults=$(mktemp)
 trap 'rm -f "$defaults"' EXIT
-# The ElevenLabs key's placeholder (KEY_PLACEHOLDER in tab5_flash.py): 64
-# bytes, so the owner's key or zeros fit in place.
-key_placeholder="elk_TAB5LOCALPLACEHOLDER0000000000000000000000000000000000000000"
-[ ${#key_placeholder} -eq 64 ] || { echo "key placeholder length" >&2; exit 1; }
 printf 'CONFIG_GADGET_SDK_TOKEN="%s"\nCONFIG_MUSE_ELEVENLABS_API_KEY="%s"\n' \
     "$placeholder" "$key_placeholder" > "$defaults"
 
