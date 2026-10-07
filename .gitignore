@@ -24,3 +24,7 @@ muse-simulator.ppm
 # Local gadget provisioning and original-device flash backups.
 .sdk-token
 /backups/
+
+# Tab5 port: flash backups (keep them outside the repo)
+*-backup.bin
+tab5-*.bin
