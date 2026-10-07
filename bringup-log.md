@@ -17,7 +17,7 @@ Unit: M5Stack Tab5, MAC `80:f1:b2:d1:44:7d`. No secrets in this file.
 
 Restore: `python -m esptool --chip esp32p4 -p COM4 -b 460800 write-flash 0 <backup .bin>`
 
-## Phase 1.1 build-only port — code written, not yet compiled
+## Phase 1.1 build-only port
 
 Built, not run. Nothing flashed.
 
@@ -39,3 +39,18 @@ Built, not run. Nothing flashed.
 
 Open risks for 1.2: esp_hosted 2.12 host vs C6 slave 1.4.1 (Wi-Fi RPCs and BT controller
 requests); BSP 1.3.1 and esp_video on IDF 6.0.1; portrait layout of the Muse UI.
+
+### First clean build (2026-10-07)
+
+- `tools/muse/board.sh build tab5`: OK. 0x221000 bytes, 47% of the 4 MB slot free.
+  Image header: chip rev v1.0 to v1.99 (this unit v1.3). Wi-Fi library: esp_hosted.
+- Every line of `devices/sdkconfig.muse-m5stack-tab5` applied. From the shared
+  `sdkconfig.muse`, `CONFIG_ESP_WIFI_{IRAM_OPT,RX_IRAM_OPT}=n`, the RX buffer count and
+  BA windows, and `CONFIG_MBEDTLS_HKDF_C` did not apply (Wi-Fi options belong to the C6
+  side under esp_wifi_remote).
+- Fixes needed for IDF 6.0.1 on the P4: `components_p4/esp_lvgl_port` (DSI callback
+  rename), esp_jpeg for `image_fetch.c` (no TJpgDec in the P4's ROM).
+- Regression: CoreS3 build OK. Host tests: 181 run, OK (2 skipped).
+- Test image `tab5-muse-test1.bin` (merged, flash at 0x0), SHA256
+  `8d78797212e7be21fa29c8eaca9be79244445d95236c715a82837d00a82b8a09`. Built without an
+  SDK token. Blanks Muse's NVS range (0x11000-0x1D000), which held Cartographer code.
