@@ -41,3 +41,29 @@ No C6 firmware or eFuse writes were made.
 - Camera, IMU, RTC tools and OTA hardware validation remain later work.
 
 See bringup-log.md for evidence and SDK-CHANGES.md for the code changes.
+
+
+## Paused handoff: camera request
+
+Owner requested camera access, then paused implementation to conserve credits.
+No camera changes have been implemented, built or flashed. Resume with camera,
+then the missing chat keyboard and emoji fixes above.
+
+- Existing generic camera API lives in esp32/components/camera. camera.capture
+  registration and its asynchronous handler are currently gated by
+  CONFIG_MUSE_WATCHER_CAMERA; do not enable the Watcher backend on Tab5.
+- Tab5 BSP has bsp_camera_start() and a CSI/V4L2 backend. Investigate SC202CS
+  sensor configuration, bounded JPEG encoding and a Tab5-specific capture driver.
+- Expose capture through the existing Muse camera.capture command. Power the
+  camera only during capture, release buffers on every error path, and validate
+  a real captured image plus a Muse request before claiming it works.
+- Working source: work/muse-gadget-sdk-repo, branch
+  tab5-hardware-bringup-fixes; draft PR #2. Build wrapper work/build_tab5.py
+  still targets the separate e8f49fd source tree: sync changed files there before
+  building. ESP-IDF 6.0.1; device COM4; app-only flashing preserves NVS.
+- Never commit SDK tokens, patched firmware or private serial output. Ask owner
+  for the token again if it is needed in a fresh session. No C6/eFuse/erase work.
+- Battery latest owner checks: 57%, 7.5 V, stays powered after USB removal.
+  Earlier low readings remain unexplained; charging and battery operation worked
+  in the latest test. Voice and Flip also work. Chat on-screen keyboard and emoji
+  remain missing; Wi-Fi Other network keyboard works.
