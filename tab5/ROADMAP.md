@@ -44,8 +44,9 @@ same status; keep them in a separate commit, as they did.
 app-typed turns), then reactions on the BMI270.
 
 **Status:** spoken replies and All messages are ported (`SDK-CHANGES.md`),
-with the ElevenLabs key patched in by the flashing kit; not yet tried on the
-Tab5. Pushes play through the voice path, so the dock shows them as spoken
+with the ElevenLabs key patched in by the flashing kit. A free alternative,
+a Kokoro server on the owner's PC set with `>tts=` ([`KOKORO.md`](KOKORO.md)),
+is used before ElevenLabs. Neither is tried on the Tab5 yet. Pushes play through the voice path, so the dock shows them as spoken
 replies. Reactions are next.
 
 ## 3. Voice quality on the Tab5

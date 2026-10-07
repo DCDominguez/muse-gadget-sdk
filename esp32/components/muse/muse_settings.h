@@ -31,6 +31,8 @@
 #define MUSE_SSID_MAX 32
 #define MUSE_PASS_MAX 64
 #define MUSE_HOST_MAX 63
+#define MUSE_TTS_URL_MAX 127
+#define MUSE_TTS_VOICE_MAX 47
 #define MUSE_VM_MAX 63
 #define MUSE_TOKEN_MAX 1023
 
@@ -67,6 +69,10 @@ void muse_settings_hatch_host(char out[MUSE_HOST_MAX + 1]);
 void muse_settings_hatch_vm(char out[MUSE_VM_MAX + 1]);
 void muse_settings_hatch_token(char out[MUSE_TOKEN_MAX + 1]);
 size_t muse_settings_hatch_token_len(void);
+/* A speech server on the home network (OpenAI's /v1/audio/speech, e.g.
+ * Kokoro-FastAPI): empty when none is set. It's used before ElevenLabs. */
+void muse_settings_tts_url(char out[MUSE_TTS_URL_MAX + 1]);
+void muse_settings_tts_voice(char out[MUSE_TTS_VOICE_MAX + 1]);
 
 void muse_settings_set_volume(int pct);
 void muse_settings_set_speaker_on(bool on);
@@ -80,6 +86,11 @@ void muse_settings_set_ble_on(bool on);
  * an empty ssid forgets every saved network. */
 void muse_settings_set_wifi(const char *ssid, const char *pass);
 void muse_settings_set_hatch_host(const char *host);
+/* False, and nothing changed, unless url is empty (no server) or an
+ * http:// or https:// URL that fits. An empty voice restores the default;
+ * false for a name with other than letters, digits and _-.+,() in it. */
+bool muse_settings_set_tts_url(const char *url);
+bool muse_settings_set_tts_voice(const char *voice);
 void muse_settings_set_hatch_vm(const char *vm);
 /* append=true adds to the stored token (for chunked BLE writes). */
 esp_err_t muse_settings_set_hatch_token(const char *token, bool append);

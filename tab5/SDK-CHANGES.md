@@ -67,6 +67,11 @@ Ported from [wupsbr/waveshare-muse-gadget-sdk](https://github.com/wupsbr/wavesha
 - `muse_chat_session.cpp`: theirs as is, plus one change: the ElevenLabs key
   is read through a volatile pointer (`elevenlabs_key()`), so a key written
   into the image after the build (the flashing kit) takes effect.
+- Ours: a speech server on the home network (OpenAI's `/v1/audio/speech`, as
+  Kokoro-FastAPI serves it), set at run time with the console command `>tts=URL`
+  (`muse_input.c`; `>tts.voice=`), kept in NVS (`muse_settings.*`: `tts_url`,
+  `tts_voice`) and used before ElevenLabs. `Kconfig`: `MUSE_TTS_VOICE`
+  (`af_heart`), `MUSE_TTS_MODEL` (`kokoro`). See [`KOKORO.md`](KOKORO.md).
 - `muse_chat.h`, `muse_voice.c`: pushes (`muse_hatch_push_take/drop`,
   `play_push`). The snore and other reaction changes are not ported yet.
   `muse_chat_link.c` (boards without PSRAM) gets no-op push functions, which

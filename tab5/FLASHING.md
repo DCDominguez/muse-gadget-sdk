@@ -54,7 +54,9 @@ Get it from gadgets.muse.ai → Account → SDK tokens. Then either:
 with ElevenLabs if the firmware has your ElevenLabs API key (with the Text to
 Speech permission). The form's second field saves it as
 `tab5-elevenlabs-key.txt`; the dialog has a second field too. It's patched in
-like the token. Without it, replies stay text.
+like the token. Without it, replies stay text. For free speech instead, run
+Kokoro on your PC and point the Tab5 at it after flashing
+([`KOKORO.md`](KOKORO.md)); no key goes in the firmware for that.
 
 The token reaches `tab5_flash.py` on stdin or as that file, never on a command
 line. It is never printed (the firmware itself logs its first 12 characters as

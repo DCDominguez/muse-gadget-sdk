@@ -156,6 +156,24 @@ menu "Muse"
             eleven_flash_v2_5 answers fastest and speaks 32 languages;
             eleven_multilingual_v2 sounds richer but starts later.
 
+    config MUSE_TTS_VOICE
+        string "Speech server voice"
+        depends on MUSE_HATCH
+        default "af_heart"
+        help
+            The voice asked of a speech server on the home network, set at run
+            time with the console command ">tts=URL" (for example Kokoro-FastAPI
+            at http://192.168.1.20:8880). A server set there is used before
+            ElevenLabs, and needs no key. ">tts.voice=NAME" changes the voice.
+            af_heart is one of Kokoro's English voices.
+
+    config MUSE_TTS_MODEL
+        string "Speech server model"
+        depends on MUSE_HATCH
+        default "kokoro"
+        help
+            The "model" field of the request to the speech server.
+
     config MUSE_TAB5_ROTATE_270
         bool "M5Stack Tab5: landscape the other way up"
         depends on MUSE_BOARD_M5STACK_TAB5

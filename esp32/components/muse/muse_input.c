@@ -584,6 +584,31 @@ __attribute__((weak)) void muse_console_dump_log(void)
     fflush(stdout);
 }
 
+/*
+ * "tts" shows the speech server, "tts=URL" sets it ("tts=" clears it) and
+ * "tts.voice=NAME" its voice ("tts.voice=" the default). A server with no
+ * path gets OpenAI's /v1/audio/speech.
+ */
+static void tts_command(const char *arg)
+{
+    bool bad = false;
+    if (arg[0] == '=') {
+        bad = !muse_settings_set_tts_url(arg + 1);
+    } else if (arg[0] == '.') {
+        bad = !muse_settings_set_tts_voice(arg + 7);
+    }
+    char url[MUSE_TTS_URL_MAX + 1];
+    char voice[MUSE_TTS_VOICE_MAX + 1];
+    muse_settings_tts_url(url);
+    muse_settings_tts_voice(voice);
+    if (bad) {
+        printf("@tts.error want tts=http://HOST:PORT (up to %d characters, no spaces) or tts= for none, "
+               "tts.voice=NAME (letters, digits, _-.+,())\n", MUSE_TTS_URL_MAX);
+    }
+    printf("@tts {\"url\":\"%s\",\"voice\":\"%s\"}\n", url, voice);
+    fflush(stdout);
+}
+
 static bool console_command(char *line, bool whole)
 {
     if (!strcmp(line, "log")) {
@@ -631,6 +656,10 @@ static bool console_command(char *line, bool whole)
         set_face(line + 5);
         return true;
     }
+    if (!strncmp(line, "tts", 3) && (!line[3] || line[3] == '=' || !strncmp(line + 3, ".voice=", 7))) {
+        tts_command(line + 3);
+        return true;
+    }
     if (strncmp(line, "chat", 4) != 0) {
         return false;
     }
@@ -662,8 +691,9 @@ static bool console_command(char *line, bool whole)
  * the device's state, "log" the log since boot, "power" the battery meter (muse_battery.h) and
  * "power.reset" starts it over, "nap" sleeps and leaves Wi-Fi at once (as
  * two minutes asleep on battery would; 'w' rejoins), "face=" shows a face
- * (see set_face), and "chat=" sends a typed message to Hatch (see chat_line
- * and tools/muse/chat.py).
+ * (see set_face), "tts=" sets a speech server (see tts_command), and
+ * "chat=" sends a typed message to Hatch (see chat_line and
+ * tools/muse/chat.py).
  */
 static void serial_task(void *arg)
 {

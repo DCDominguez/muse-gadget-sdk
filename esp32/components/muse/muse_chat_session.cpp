@@ -1592,9 +1592,11 @@ static const char *elevenlabs_key(void)
 }
 
 /*
- * ElevenLabs text-to-speech (CONFIG_MUSE_ELEVENLABS_API_KEY). One fetch at a
- * time runs on its own task, over HTTPS to the internet rather than the VM
- * connection, and streams the MP3 into s_tts_rx. This task drains it into
+ * Text-to-speech from a speech server on the home network (the "tts=" console
+ * setting: OpenAI's /v1/audio/speech, as Kokoro-FastAPI serves it) or else
+ * ElevenLabs (CONFIG_MUSE_ELEVENLABS_API_KEY). One fetch at a time runs on its
+ * own task, over HTTP(S) rather than the VM connection, and streams the MP3
+ * into s_tts_rx. This task drains it into
  * tts_data() (tts_pump), so the turn's MP3 state stays on one task. A turn
  * that ends or is cancelled bumps s_tts_job; the fetch sees it and stops.
  */
@@ -1614,9 +1616,28 @@ static std::atomic<bool> s_tts_busy{false};    /* the fetch task holds a job */
 static std::atomic<bool> s_tts_ok{false};      /* the last job's response was a whole MP3 */
 static bool s_tts_pending;                     /* tts_msg's speech is still arriving */
 
+/* The speech server's request URL, or false when none is set. */
+static bool tts_server_url(char *url, size_t len)
+{
+    char base[MUSE_TTS_URL_MAX + 1];
+    muse_settings_tts_url(base);
+    if (!base[0]) {
+        return false;
+    }
+    const char *host = strstr(base, "://") + 3;
+    bool path = strchr(host, '/') && strchr(host, '/')[1];
+    size_t n = strlen(base);
+    if (base[n - 1] == '/') {
+        base[n - 1] = '\0';
+    }
+    snprintf(url, len, "%s%s", base, path ? "" : "/v1/audio/speech");
+    return true;
+}
+
 static bool tts_enabled(void)
 {
-    return elevenlabs_key()[0] != '\0';
+    char url[TTS_URL_MAX];
+    return tts_server_url(url, sizeof(url)) || elevenlabs_key()[0] != '\0';
 }
 
 static bool tts_send(uint32_t job, const uint8_t *data, size_t len)
@@ -1635,11 +1656,24 @@ static bool tts_send(uint32_t job, const uint8_t *data, size_t len)
 static bool tts_fetch(const tts_job_t &j)
 {
     char url[TTS_URL_MAX];
-    snprintf(url, sizeof(url), "https://api.elevenlabs.io/v1/text-to-speech/%s/stream?output_format=mp3_22050_32",
-             CONFIG_MUSE_ELEVENLABS_VOICE_ID);
+    bool server = tts_server_url(url, sizeof(url));
+    const char *who = server ? "the speech server" : "ElevenLabs";
     cJSON *req = cJSON_CreateObject();
-    cJSON_AddStringToObject(req, "text", j.text);
-    cJSON_AddStringToObject(req, "model_id", CONFIG_MUSE_ELEVENLABS_MODEL);
+    if (server) {
+        char voice[MUSE_TTS_VOICE_MAX + 1];
+        muse_settings_tts_voice(voice);
+        cJSON_AddStringToObject(req, "model", CONFIG_MUSE_TTS_MODEL);
+        cJSON_AddStringToObject(req, "input", j.text);
+        cJSON_AddStringToObject(req, "voice", voice);
+        cJSON_AddStringToObject(req, "response_format", "mp3");
+        cJSON_AddBoolToObject(req, "stream", true);
+    } else {
+        snprintf(url, sizeof(url),
+                 "https://api.elevenlabs.io/v1/text-to-speech/%s/stream?output_format=mp3_22050_32",
+                 CONFIG_MUSE_ELEVENLABS_VOICE_ID);
+        cJSON_AddStringToObject(req, "text", j.text);
+        cJSON_AddStringToObject(req, "model_id", CONFIG_MUSE_ELEVENLABS_MODEL);
+    }
     char *body = cJSON_PrintUnformatted(req);
     cJSON_Delete(req);
     if (!body) {
@@ -1654,13 +1688,15 @@ static bool tts_fetch(const tts_job_t &j)
     esp_http_client_handle_t c = esp_http_client_init(&cfg);
     bool ok = false;
     if (c) {
-        esp_http_client_set_header(c, "xi-api-key", elevenlabs_key());
+        if (!server) {
+            esp_http_client_set_header(c, "xi-api-key", elevenlabs_key());
+        }
         esp_http_client_set_header(c, "Content-Type", "application/json");
         esp_http_client_set_header(c, "Accept", "audio/mpeg");
         int len = strlen(body);
         int64_t t0 = esp_timer_get_time();
         if (esp_http_client_open(c, len) != ESP_OK || esp_http_client_write(c, body, len) != len) {
-            ESP_LOGW(TAG, "speech: can't reach ElevenLabs");
+            ESP_LOGW(TAG, "speech: can't reach %s", who);
         } else {
             esp_http_client_fetch_headers(c);
             int status = esp_http_client_get_status_code(c);
@@ -1668,7 +1704,7 @@ static bool tts_fetch(const tts_job_t &j)
             if (status != 200) {
                 int n = esp_http_client_read(c, (char *)buf, sizeof(buf) - 1);
                 buf[n > 0 ? n : 0] = '\0';
-                ESP_LOGW(TAG, "speech: ElevenLabs HTTP %d %s", status, (char *)buf);
+                ESP_LOGW(TAG, "speech: %s HTTP %d %s", who, status, (char *)buf);
             } else {
                 size_t total = 0;
                 int n;
