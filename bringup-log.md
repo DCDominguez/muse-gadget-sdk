@@ -54,3 +54,16 @@ requests); BSP 1.3.1 and esp_video on IDF 6.0.1; portrait layout of the Muse UI.
 - Test image `tab5-muse-test1.bin` (merged, flash at 0x0), SHA256
   `8d78797212e7be21fa29c8eaca9be79244445d95236c715a82837d00a82b8a09`. Built without an
   SDK token. Blanks Muse's NVS range (0x11000-0x1D000), which held Cartographer code.
+
+### Test image 2 (2026-10-07): dock, keyboard, battery, flip
+
+- 800x480 Muse at top left; muse_dock fills the rest (status, typed chat, hold-to-talk,
+  volume/brightness, Sleep, Flip, hold-to-power-off; on-screen keyboard without a Tab5 Keyboard).
+- Tab5 Keyboard (A164): I2C 0x6D on Ext.Port1 (G0/G1, I2C port 0), HID mode, polled every 20 ms,
+  probed every 2 s for hot-plug. Tab held = talk.
+- Battery: INA226 0x41 bus/shunt + CHG_STAT (expander 0x44 pin 6). USB presence inferred.
+- Sleep is backlight-off with LVGL running (touch or keyboard wakes); no light sleep yet.
+- Builds: Tab5, CoreS3, Cardputer ADV. Host tests OK.
+- `tab5-muse-test2.bin` (merged, first flash, blanks NVS) SHA256
+  `68ed98cc0268ede73c64834ab122c12297a9b5cf18f6cf57fd3a9d16b53df6bf`;
+  `tab5-muse-test2-app-only.bin` for updates at 0x20000 (keeps pairing).
