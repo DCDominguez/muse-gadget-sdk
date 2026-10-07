@@ -1,0 +1,8 @@
+wifi=connected
+link=online
+battery=80
+keyboard=false
+face=idle
+advance=400
+react=dizzy
+advance=1200

@@ -70,6 +70,7 @@ static void usage(FILE *out, const char *argv0)
             "  paired=true|false  link=boot|unpaired|pairing|confirm|connecting|online|offline|error\n"
             "  speaker=true|false brightness=10..100 advance=MILLISECONDS\n"
             "  tap=X,Y (a touch and release)\n"
+            "  react=dizzy|drowse|wake|tickle (the avatar's reactions)\n"
             "  --board tab5 only: keyboard=true|false (Tab5 Keyboard attached)\n"
             "  type=TEXT|enter|backspace|esc (keys from the keyboard to the chat)\n"
             "\n"
@@ -392,6 +393,21 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
             for (const char *c = value; *c; c++) {
                 muse_dock_key((uint8_t)*c);
             }
+        }
+        return true;
+    }
+    if (!strcmp(key, "react")) {
+        /* The avatar's reactions, as shaking, idling, waking or rubbing start them. */
+        if (!strcmp(value, "dizzy")) {
+            muse_state_start_dizzy();
+        } else if (!strcmp(value, "drowse")) {
+            muse_state_start_drowsing(0.0f);
+        } else if (!strcmp(value, "wake")) {
+            muse_state_end_drowsing();
+        } else if (!strcmp(value, "tickle")) {
+            muse_state_start_tickle();
+        } else {
+            return false;
         }
         return true;
     }

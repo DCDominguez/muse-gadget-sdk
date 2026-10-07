@@ -201,6 +201,9 @@ Supported scenario keys are:
 - `link`: `boot`, `unpaired`, `pairing`, `confirm`, `connecting`, `online`,
   `offline`, or `error`
 - `speaker`, `brightness`, and `advance` in milliseconds
+- `react`: `dizzy`, `drowse`, `wake` (ends drowsing) or `tickle`, the
+  avatar's reactions to shaking, idling and rubbing; `advance` to a moment
+  in them
 
 Invalid options and scenario values return a nonzero exit status and identify
 the bad line.
