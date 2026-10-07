@@ -19,6 +19,10 @@
 # in (tab5_flash.py). Needs ESP-IDF v6.0.1 (see esp32/AGENTS.md).
 #
 #   tab5/tools/make_kit.sh NAME [OUT_DIR]     e.g. make_kit.sh test3 /tmp/kits
+#   KIT_VERSION=999.1.0 tab5/tools/make_kit.sh ota1
+#
+# KIT_VERSION sets the firmware version (default: esp32/version.txt). An OTA
+# installs only a newer version than the running one, unless forced.
 set -euo pipefail
 
 name=${1:?kit name, e.g. test3}
@@ -49,7 +53,9 @@ printf 'CONFIG_GADGET_SDK_TOKEN="%s"\n' "$placeholder" > "$defaults"
 
 cd "$esp"
 rm -rf "$B" managed_components dependencies.lock
-idf.py -B "$B" -DIDF_TARGET=esp32p4 -DSDKCONFIG="$B/sdkconfig" \
+ver_arg=()
+[ -n "${KIT_VERSION:-}" ] && ver_arg=(-DPROJECT_VER="$KIT_VERSION")
+idf.py -B "$B" -DIDF_TARGET=esp32p4 -DSDKCONFIG="$B/sdkconfig" "${ver_arg[@]}" \
     -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;devices/sdkconfig.muse;devices/sdkconfig.muse-m5stack-tab5;$defaults" \
     build | tail -3
 python3 - "$B/muse-gadget-unsigned.bin" "$placeholder" <<'EOF'

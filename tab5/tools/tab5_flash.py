@@ -22,6 +22,12 @@ command line, and the patched image is deleted afterwards.
 
   python tab5_flash.py --port COM4 --first  < token     first flash (base + app)
   python tab5_flash.py --port COM4          < token     update the app only
+  python tab5_flash.py --ota-out app.bin    < token     signed image for device.ota
+
+An OTA image holds the token: keep it off anything public (a GitHub release
+of the public fork, a public bucket). Muse installs it from an HTTPS URL with
+device.ota, and only if its version is newer than the running one (build kits
+with KIT_VERSION) unless the request says force.
 
 Safety (plan.md): refuses unless the board is an ESP32-P4 with the expected
 MAC, every kit file matches SHA256SUMS.txt, and a 16 MB backup of this board
@@ -204,7 +210,8 @@ def capture(port, secs, out_path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--port", required=True)
+    ap.add_argument("--port", help="the Tab5's serial port (not needed with --ota-out)")
+    ap.add_argument("--ota-out", help="write the signed app for device.ota here instead of flashing")
     ap.add_argument("--first", action="store_true",
                     help="first flash: base image at 0x0 (blanks Muse's settings) and the factory-data slot")
     ap.add_argument("--mac", default="80:f1:b2:d1:44:7d")
@@ -217,6 +224,26 @@ def main():
 
     check_kit()
     token = read_token(a.token_file)
+    if a.ota_out:
+        work = tempfile.mkdtemp(prefix="tab5-")
+        unsigned = signed = ""
+        try:
+            unsigned, signed = sign(patch(token), work)
+            with open(signed, "rb") as src, open(a.ota_out, "wb") as dst:
+                dst.write(src.read())
+        finally:
+            scrub(unsigned)
+            scrub(signed)
+            try:
+                os.rmdir(work)
+            except OSError:
+                pass
+            if a.token_file:
+                scrub(a.token_file)
+        print(f"OTA image: {a.ota_out}. It holds your SDK token: host it privately, over HTTPS.")
+        return
+    if not a.port:
+        die("--port is required to flash")
     check_board(a.port, a.mac)
     check_backup(a.mac, a.backups)
     work = tempfile.mkdtemp(prefix="tab5-")

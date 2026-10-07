@@ -5,14 +5,17 @@ check. Hardware state is in [`NEXT-STEPS.md`](NEXT-STEPS.md).
 
 ## 1. Verify what's already built in
 
-The Tab5 build already has these on (the shared `devices/sdkconfig.muse`);
-none has been exercised on the device.
+The Tab5 build already has these on (the shared `devices/sdkconfig.muse`):
+`CONFIG_HOMEHUB_DISPLAY_COMMANDS`, `CONFIG_HOMEHUB_TUNNEL`,
+`CONFIG_HOMEHUB_OTA_ENABLED` with app rollback and signature checks on update.
+The tunnel and OTA code use no Wi-Fi-driver calls that `esp_wifi_remote`
+lacks. None has been exercised on the device.
 
 | Feature | P4-specific risk | Test |
 |---|---|---|
 | Images from Muse (`display.draw_url`) | JPEG decoding comes from `esp_jpeg`, not ROM; images fill the 800×480 Muse box, not the whole screen | Ask Muse to show a picture |
 | Home-network tunnel | Runs over `esp_wifi_remote`'s netif, not a local Wi-Fi netif | Muse reaches a device on the home network |
-| OTA updates | Signed with the dev key, `partitions_muse.csv`; the update arrives over the C6 link | `device.ota` from Muse, then the version after reboot |
+| OTA updates | Signed with the dev key, `partitions_muse.csv`; the update arrives over the C6 link. Muse installs from a URL; the image must be newer (`KIT_VERSION`) and holds the SDK token, so it's hosted privately (`FLASHING.md`) | `device.ota` with a `KIT_VERSION=999.1.0` image, then `>status` after the reboot; check rollback by sending a deliberately broken URL |
 
 ## 2. Voice and message sync, from wupsbr/waveshare-muse-gadget-sdk
 

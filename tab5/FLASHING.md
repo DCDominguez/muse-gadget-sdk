@@ -91,6 +91,30 @@ three, per `plan.md`).
 
 The Muse console also answers `>status`, `>power` and `>log` at any time.
 
+## Update over the air
+
+Muse installs firmware with `device.ota` from an HTTPS URL it's given. The
+image must be signed with the SDK's dev key (checked before it's installed),
+and newer than the running version unless the request says `force`. Every
+build is `999.0.0` (`esp32/version.txt`), so build OTA kits with a higher
+version:
+
+```sh
+KIT_VERSION=999.1.0 tab5/tools/make_kit.sh ota1
+```
+
+On your PC, in the unzipped kit, make the image with your token in it:
+
+```powershell
+python tab5_flash.py --ota-out tab5-ota.bin --token-file tab5-sdk-token.txt
+```
+
+**`tab5-ota.bin` holds your SDK token.** Host it privately over HTTPS (a
+private bucket or a short-lived signed URL), never as a release asset of the
+public fork. Then ask Muse to update the Tab5 from that URL. After the reboot
+the new image must reach Muse's control session within the rollback window
+(`main/app.c`), or the Tab5 goes back to the previous image by itself.
+
 ## Roll back
 
 To restore the Tab5 exactly as it was backed up:
