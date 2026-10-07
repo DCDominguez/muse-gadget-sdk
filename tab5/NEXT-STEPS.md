@@ -15,7 +15,10 @@ No C6 firmware or eFuse writes were made.
    battery-only operation are confirmed. Percentage remains a voltage estimate;
    earlier 1.5–1.8 V readings are unresolved historical observations. Monitor for
    recurrence rather than changing the conversion without new evidence.
-2. **Chat on-screen keyboard.** Physical unplug detection works and Wi-Fi Other
+2. **Chat on-screen keyboard: fixed, verify on hardware.** It was opening off the bottom of the
+   screen (`lv_keyboard_create()` aligns bottom-centre, so the position became an offset).
+   A tap on the chat line now always opens it, with or without the Tab5 Keyboard. Reproduced
+   and checked in the simulator (`--board tab5`), which now has Tab5 tests. Original notes: Physical unplug detection works and Wi-Fi Other
    network opens its keyboard. Chat input remains focused across unplug, so check
    its click/focus handling and reconnect/disconnect transitions. Allow manually
    opening the keyboard even with a physical keyboard present. Validate first tap,

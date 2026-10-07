@@ -1,0 +1,9 @@
+wifi=connected
+link=online
+battery=57
+keyboard=true
+advance=400
+# Type on the Tab5 Keyboard and send: both bubbles appear in the chat.
+type=Hello Muse
+type=enter
+advance=600

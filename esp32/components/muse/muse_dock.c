@@ -25,6 +25,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include "sdkconfig.h"
 
 #include "muse_audio.h"
 #include "muse_board.h"
@@ -209,7 +210,11 @@ static lv_obj_t *bubble(bool mine, uint32_t color, const char *str)
     lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(b, 12, 0);
     lv_obj_set_style_pad_all(b, 10, 0);
-    lv_obj_set_style_align(b, mine ? LV_ALIGN_TOP_RIGHT : LV_ALIGN_TOP_LEFT, 0);
+    /* The log is a flex column, which ignores per-item alignment: push the
+     * owner's bubbles right with the room the 88% width leaves. */
+    if (mine) {
+        lv_obj_set_style_margin_left(b, lv_obj_get_content_width(s_log) * 12 / 100, 0);
+    }
     lv_label_set_text(b, str);
     scroll_to_end();
     return b;
@@ -278,11 +283,12 @@ static void on_osk(lv_event_t *e)
     }
 }
 
+/* Focus opens the on-screen keyboard unless a keyboard is attached; a tap on
+ * the line always opens it, so it's there with a keyboard plugged in too. */
 static void on_input_focus(lv_event_t *e)
 {
-    (void)e;
     bool keyboard = muse_board->keyboard_present && muse_board->keyboard_present();
-    if (!keyboard) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED || !keyboard) {
         lv_obj_remove_flag(s_osk, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(s_osk);
     }
@@ -669,7 +675,9 @@ void muse_dock_build(lv_obj_t *scr, int ui_x, int ui_y, int ui_w, int ui_h)
 
     /* On-screen keyboard over the strip, for typing without one attached. */
     s_osk = lv_keyboard_create(scr);
-    lv_obj_set_pos(s_osk, ui_x, strip_y);
+    /* lv_keyboard_create() aligns it bottom-centre, which would make a
+     * position an offset from there and put it off the screen. */
+    lv_obj_align(s_osk, LV_ALIGN_TOP_LEFT, ui_x, strip_y);
     lv_obj_set_size(s_osk, ui_w, strip_h);
     lv_keyboard_set_textarea(s_osk, s_input);
     lv_obj_add_event_cb(s_osk, on_osk, LV_EVENT_READY, NULL);

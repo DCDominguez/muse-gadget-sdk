@@ -134,6 +134,21 @@ For a quick manual smoke test:
 8. Press P and confirm that `muse-simulator.ppm` appears in the current
    directory, then press Esc to quit.
 
+### M5Stack Tab5 layout
+
+`--board tab5` opens a 1280 x 720 window instead: Muse in an 800 x 480 box with
+`muse_dock` around it (status, typed chat, hold-to-talk and quick controls), as
+on the Tab5. Typed chat answers with a canned reply. Scenarios can also use
+`tap=X,Y` (a scripted touch), `keyboard=true|false` (the Tab5 Keyboard
+attached) and `type=TEXT`, `type=enter`, `type=backspace` or `type=esc` (keys
+from that keyboard). The Tab5 tests use the scenarios in
+`tests/scenarios_tab5/`.
+
+```sh
+./esp32/simulator/build/muse_simulator --board tab5 --headless \
+  --scenario esp32/simulator/tests/scenarios_tab5/chat.txt --screenshot tab5.ppm
+```
+
 An included scenario can also initialize a visible interactive session:
 
 ```sh

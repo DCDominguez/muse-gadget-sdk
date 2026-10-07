@@ -58,6 +58,14 @@ other boards share, with why and what they do elsewhere. Upstream is
   (`espressif/m5stack_tab5` 1.3.1, keyed on `MUSE_BOARD_ID`) as for any board.
 - `tools/muse/board.sh`, `ports.py`, `avatar.py`: the `tab5` alias.
 
+## Simulator
+
+`esp32/simulator` compiles `muse_dock.c` (it no longer linked after
+`muse_ui.c` began calling `muse_dock_build()`), with stubs for its services.
+`--board tab5` renders the Tab5 layout; `tap=`, `keyboard=` and `type=`
+scenario keys and `tests/scenarios_tab5/` cover the dock's chat and on-screen
+keyboard. The Watcher profile and its tests are unchanged.
+
 ## Docs
 
 `esp32/AGENTS.md`, `esp32/README.md`, `esp32/devices/README.md` and
