@@ -10,15 +10,11 @@ No C6 firmware or eFuse writes were made.
 
 ## Next work, in order
 
-1. **Battery after charging.** Owner is leaving it on a wall charger for 15–30 minutes.
-   Record displayed voltage/percentage and charging indicator before and after USB
-   removal. Battery-only startup was confirmed after pressing power. USB readings
-   around 1.5–1.8 V conflict with battery-only readings around 6.48 V; the pack's
-   display previously said 69%. Establish actual pack-terminal voltage with a meter
-   or a known-good compatible pack if discrepancies persist. Check contacts and
-   charger path before changing the voltage conversion or inventing a percentage.
-   USB host detection fixes classification, not charging or calibration. Wall-charger
-   detection still relies on charger status/current because there is no VBUS sense.
+1. **Battery verification complete for this test.** After wall charging, owner
+   reports 57% / 7.5 V and confirms the Tab5 stays on without USB. Charging and
+   battery-only operation are confirmed. Percentage remains a voltage estimate;
+   earlier 1.5–1.8 V readings are unresolved historical observations. Monitor for
+   recurrence rather than changing the conversion without new evidence.
 2. **Chat on-screen keyboard.** Physical unplug detection works and Wi-Fi Other
    network opens its keyboard. Chat input remains focused across unplug, so check
    its click/focus handling and reconnect/disconnect transitions. Allow manually

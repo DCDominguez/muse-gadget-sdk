@@ -112,3 +112,7 @@ Owner battery-only test: Tab5 starts and stays on after unplugging USB and press
 USB measurement follow-up: owner requested loading fix after console power JSON showed running=true while COM4 USB was connected. Board read_power now recognizes ESP-IDF USB Serial/JTAG host SOF connection in addition to charger status/current. This fixes PC USB classification when charging is idle. Wall charger detection still relies on charging activity because there is no direct VBUS sense. This changes power classification/runtime measurement, not charge rate or percentage calibration. Build/flash validation pending.
 
 USB detection build and app-only flash passed; write hash verified. 60-second capture: wifi/ws/raw up, no crash/brownout markers. USB power query confirms boot=usb, started=false, running=false: runtime measurement is stopped while on PC USB. Historical saved measurement remains visible as a completed run. Rear pack read around 1.74 V in this USB-connected state; charging and battery-voltage discrepancy remain unresolved beyond the earlier battery-only startup confirmation.
+
+#### Charging validation after wall charge
+
+Owner reports 57% / 7.5 V after charging, and confirms Tab5 stays on when USB is removed. 7.5 V is consistent with the current voltage-derived 56-57% estimate. Charging and battery-powered operation are verified for this test. Earlier anomalous 1.5-1.8 V readings are retained as historical observations; root cause was not conclusively isolated. Percentage remains a voltage estimate, not a calibrated fuel gauge.
