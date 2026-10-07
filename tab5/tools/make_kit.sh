@@ -93,7 +93,7 @@ EOF
 (cd "$kit" && sha256sum tab5-muse-base.bin tab5-muse-app-unsigned.bin dev_signing_key.pem \
     tab5_flash.py tab5-flash.ps1 tab5-sdk-token.html CODEX_PROMPT.md > SHA256SUMS.txt)
 (cd "$kit" && python3 -I -c "import sys; sys.path.insert(0, '.'); sys.argv = ['x']
-import tab5_flash as t; t.check_kit(); assert bytes(t.patch(t.PLACEHOLDER)) == open(t.APP, 'rb').read()" \
+import tab5_flash as t; t.check_kit(); assert bytes(t.patch(t.PLACEHOLDER, t.KEY_PLACEHOLDER)) == open(t.APP, 'rb').read()" \
     && rm -rf __pycache__)
 (cd "$out" && rm -f "tab5-kit-$name.zip" && python3 -I -m zipfile -c "tab5-kit-$name.zip" "tab5-kit-$name")
 echo "kit: $out/tab5-kit-$name.zip"
