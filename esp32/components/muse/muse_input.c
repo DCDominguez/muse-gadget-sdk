@@ -578,8 +578,18 @@ static void set_face(const char *name)
  * Console-only commands; false for setup commands. Their buffers are taken
  * per command: without PSRAM, static ones would hold internal RAM for good.
  */
+__attribute__((weak)) void muse_console_dump_log(void)
+{
+    printf("@log none\n");
+    fflush(stdout);
+}
+
 static bool console_command(char *line, bool whole)
 {
+    if (!strcmp(line, "log")) {
+        muse_console_dump_log();
+        return true;
+    }
     if (!strcmp(line, "status")) {
         size_t cap = 1024;   /* long SSID, host and VM names escaped: past 512 */
         char *json = heap_caps_malloc(cap, MUSE_BIG_CAPS);
@@ -649,7 +659,7 @@ static bool console_command(char *line, bool whole)
  * menu's Down / Select; 'p' sends a screenshot; 'z' / 'w' sleep and wake.
  * A line starting with '>' is a setup command, the same "key=value" text as
  * the BLE CMD characteristic, or one of the console's own: "status" prints
- * the device's state, "power" the battery meter (muse_battery.h) and
+ * the device's state, "log" the log since boot, "power" the battery meter (muse_battery.h) and
  * "power.reset" starts it over, "nap" sleeps and leaves Wi-Fi at once (as
  * two minutes asleep on battery would; 'w' rejoins), "face=" shows a face
  * (see set_face), and "chat=" sends a typed message to Hatch (see chat_line

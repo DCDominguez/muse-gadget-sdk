@@ -34,5 +34,9 @@ esp_err_t muse_console_install(size_t rx_buf);
 /* Blocks for the next byte; false on a driver error. */
 bool muse_console_getc(uint8_t *c);
 void muse_console_write(const void *buf, size_t n);
+/* The ">log" command: prints the log since boot, which a host that opened the
+ * port late (Windows re-enumerating after a reset) missed. Home Link provides
+ * it from its in-memory capture; the default says there is none. */
+void muse_console_dump_log(void);
 /* A USB host is reading the port. A UART bridge can't tell: false. */
 bool muse_console_host(void);

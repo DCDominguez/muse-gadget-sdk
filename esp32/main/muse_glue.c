@@ -16,6 +16,7 @@
 
 #include "muse_glue.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -28,6 +29,7 @@
 #include "freertos/task.h"
 
 #include "app.h"
+#include "diagnostic_log.h"
 #include "ble_server.h"
 #include "config_store.h"
 #include "identity.h"
@@ -37,6 +39,7 @@
 #include "wifi_mgr.h"
 
 #include "muse_ble.h"
+#include "muse_console.h"
 #include "muse_board.h"
 #include "muse_link.h"
 #include "muse_mem.h"
@@ -614,6 +617,25 @@ static void boot_task(void *arg) {
     stack_monitor_record(NULL);
     vTaskDelete(NULL);
 }
+
+#if CONFIG_HOMEHUB_SUPPORT_BUG_REPORT
+// ">log" on the Muse console: the log captured since boot (diagnostic_log.h),
+// between "@log begin" and "@log end".
+void muse_console_dump_log(void) {
+    diagnostic_log_snapshot_t snap;
+    if (!diagnostic_log_snapshot(&snap)) {
+        printf("@log none\n");
+        fflush(stdout);
+        return;
+    }
+    printf("@log begin {\"bytes\":%u,\"truncated\":%s,\"overwritten_lines\":%u}\n",
+           (unsigned)snap.len, snap.truncated ? "true" : "false", (unsigned)snap.overwritten_lines);
+    fwrite(snap.data, 1, snap.len, stdout);
+    printf("\n@log end\n");
+    fflush(stdout);
+    diagnostic_log_snapshot_free(&snap);
+}
+#endif
 
 void muse_glue_start(void) {
     s_ready = xEventGroupCreate();

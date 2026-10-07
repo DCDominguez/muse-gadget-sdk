@@ -28,3 +28,6 @@ muse-simulator.ppm
 # Tab5 port: flash backups (keep them outside the repo)
 *-backup.bin
 tab5-*.bin
+
+# Tab5 flashing kit: the SDK token file the local form saves
+tab5-sdk-token.txt
