@@ -36,6 +36,7 @@
  */
 #include <string.h>
 
+#include "bmi270.h"
 #include "bsp/esp-bsp.h"
 #include "driver/i2c_master.h"
 #include "driver/usb_serial_jtag.h"
@@ -49,6 +50,7 @@
 #include "muse_board.h"
 #include "muse_audio.h"
 #include "muse_dock.h"
+#include "muse_imu.h"
 #include "muse_mem.h"
 #include "muse_settings.h"
 
@@ -200,11 +202,53 @@ static void keyboard_bus_init(void)
     }
 }
 
+/* ---- Motion (BMI270, for the shake reaction) ---------------------------- */
+
+static bmi270_handle_t *s_imu;
+
+static bool imu_read(float a[3])
+{
+    return bmi270_get_acce_data(s_imu, &a[0], &a[1], &a[2]) == ESP_OK;
+}
+
+/* +-8 g as for the QMI8658 boards; 200 Hz is plenty for a 20 ms poll. */
+static void imu_init(void)
+{
+    const bmi270_driver_config_t drv = {
+        .addr = BMI270_I2C_ADDRESS_L,
+        .interface = BMI270_USE_I2C,
+        .i2c_bus = bsp_i2c_get_handle(),
+    };
+    const bmi270_config_t cfg = {
+        .acce_odr = BMI270_ACC_ODR_200_HZ,
+        .acce_range = BMI270_ACC_RANGE_8_G,
+        .gyro_odr = BMI270_GYR_ODR_200_HZ,
+        .gyro_range = BMI270_GYR_RANGE_1000_DPS,
+    };
+    esp_err_t err = ESP_ERR_NOT_FOUND;
+    if (drv.i2c_bus && i2c_master_probe(drv.i2c_bus, drv.addr, 50) == ESP_OK) {
+        err = bmi270_create(&drv, &s_imu);
+        if (err == ESP_OK) {
+            err = bmi270_start(s_imu, &cfg);
+        }
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "BMI270 at 0x%02x: %s; no shake reaction", drv.addr, esp_err_to_name(err));
+        if (s_imu) {
+            bmi270_delete(s_imu);
+            s_imu = NULL;
+        }
+        return;
+    }
+    muse_imu_use(imu_read, "BMI270 +-8 g, 200 Hz");
+}
+
 static esp_err_t init(void)
 {
     ESP_RETURN_ON_ERROR(bsp_i2c_init(), TAG, "i2c init");
     power_init();
     keyboard_bus_init();
+    imu_init();
     return ESP_OK;
 }
 
