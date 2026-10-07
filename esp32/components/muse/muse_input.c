@@ -69,6 +69,8 @@ static const char *TAG = "muse_input";
 
 static QueueHandle_t s_queue;
 static TaskHandle_t s_input;
+/* Edges posted by muse_input_post_buttons(), taken by the next poll. */
+static unsigned s_posted;
 static bool s_talk_down;
 static bool s_cpu_low;      /* display stopped and the CPU allowed to sleep */
 static volatile bool s_power_off_requested;
@@ -389,6 +391,14 @@ static bool update_wifi_nap(TickType_t now, bool paused)
     return napping;
 }
 
+void muse_input_post_buttons(unsigned edges)
+{
+    __atomic_or_fetch(&s_posted, edges, __ATOMIC_ACQ_REL);
+    if (s_input) {
+        xTaskNotifyGive(s_input);   /* out of wait_buttons() */
+    }
+}
+
 static void input_task(void *arg)
 {
     (void)arg;
@@ -398,7 +408,7 @@ static void input_task(void *arg)
     TickType_t powered = xTaskGetTickCount() - pdMS_TO_TICKS(POWER_MS);
 
     for (;;) {
-        unsigned ev = muse_board->poll_buttons();
+        unsigned ev = muse_board->poll_buttons() | __atomic_exchange_n(&s_posted, 0u, __ATOMIC_ACQ_REL);
         if (ev & (MUSE_BTN_TALK_PRESS | MUSE_BTN_TALK_RELEASE)) {
             ESP_LOGI(TAG, "talk key:%s%s", ev & MUSE_BTN_TALK_PRESS ? " press" : "",
                      ev & MUSE_BTN_TALK_RELEASE ? " release" : "");

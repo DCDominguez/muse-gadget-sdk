@@ -35,6 +35,7 @@
 #include "muse_board.h"
 #include "muse_chat.h"
 #include "muse_console.h"
+#include "muse_dock.h"
 #include "muse_link.h"
 #include "muse_mem.h"
 #include "muse_menu.h"
@@ -90,6 +91,9 @@ static bool s_tall;         /* compact, with room above and below Muse (StickS3)
 static int s_canvas_px;     /* Muse's size on screen */
 static int s_dy;            /* full layout: offset from a 466 px tall screen */
 static lv_indev_t *s_indev;
+/* Where the UI lives: the screen, or on a panel larger than the board's
+ * width x height (the Tab5), a box at ui_x, ui_y with muse_dock around it. */
+static lv_obj_t *s_root;
 static lv_obj_t *s_tv;
 static lv_obj_t *s_face;
 static lv_obj_t *s_settings;
@@ -795,6 +799,20 @@ static void build_screen(void)
     lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+    lv_display_t *disp = lv_obj_get_display(scr);
+    if (lv_display_get_horizontal_resolution(disp) > s_w || lv_display_get_vertical_resolution(disp) > s_h) {
+        s_root = lv_obj_create(scr);
+        lv_obj_remove_style_all(s_root);
+        lv_obj_set_size(s_root, s_w, s_h);
+        lv_obj_set_pos(s_root, muse_board->ui_x, muse_board->ui_y);
+        lv_obj_set_style_bg_color(s_root, lv_color_black(), 0);
+        lv_obj_set_style_bg_opa(s_root, LV_OPA_COVER, 0);
+        lv_obj_set_style_clip_corner(s_root, false, 0);
+        lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE);
+        scr = s_root;
+    } else {
+        s_root = scr;
+    }
 
     lv_obj_t *face = scr;
     if (muse_board->touch) {
@@ -1022,7 +1040,7 @@ static void on_any_press(lv_event_t *e)
 
 static void build_overlays(void)
 {
-    lv_obj_t *scr = lv_screen_active();
+    lv_obj_t *scr = s_root;
 
     /* Page dots. */
     for (int i = 0; i < 2 && s_tv; i++) {
@@ -1064,7 +1082,11 @@ static void build_overlays(void)
     s_pair = lv_obj_create(lv_layer_top());
     lv_obj_remove_style_all(s_pair);
     lv_obj_set_size(s_pair, s_small ? s_w - 8 : 300, s_small ? LV_SIZE_CONTENT : 150);
-    lv_obj_center(s_pair);
+    lv_obj_align(s_pair, LV_ALIGN_TOP_LEFT, muse_board->ui_x + (s_w - (s_small ? s_w - 8 : 300)) / 2,
+                 muse_board->ui_y + (s_h - 150) / 2);
+    if (s_root == lv_screen_active()) {
+        lv_obj_center(s_pair);
+    }
     lv_obj_set_flex_flow(s_pair, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(s_pair, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_ver(s_pair, s_small ? 10 : 18, 0);
@@ -1569,9 +1591,12 @@ esp_err_t muse_ui_start(void)
     if (s_settings) {
         muse_settings_ui_build(s_settings);
     } else {
-        muse_menu_build(lv_screen_active(), s_w, s_h);
+        muse_menu_build(s_root, s_w, s_h);
     }
     build_overlays();
+    if (s_root != lv_screen_active()) {
+        muse_dock_build(lv_screen_active(), muse_board->ui_x, muse_board->ui_y, s_w, s_h);
+    }
     lv_timer_create(frame_tick, muse_board->frame_ms, NULL);
     s_ready = true;
     muse_board->display_unlock();
