@@ -17,6 +17,25 @@ Unit: M5Stack Tab5, MAC `80:f1:b2:d1:44:7d`. No secrets in this file.
 
 Restore: `python -m esptool --chip esp32p4 -p COM4 -b 460800 write-flash 0 <backup .bin>`
 
-## Phase 1.1 build-only port
+## Phase 1.1 build-only port — code written, not yet compiled
 
-(in progress)
+Built, not run. Nothing flashed.
+
+- Board `m5stack_tab5` (`MUSE_BOARD_M5STACK_TAB5`, ESP32-P4), alias `tab5` in `tools/muse/`.
+- Display, touch, codecs and expanders through `espressif/m5stack_tab5` 1.3.1. LCD_EN released
+  500 ms before the BSP's panel probe (Cartographer's fix for the rev v1.3 cold-start assert).
+  Native portrait 720x1280, no software rotation; orientation to settle in 1.2.
+- Wi-Fi: `esp_wifi_remote` + `esp_hosted` 2.12.x (host line nearest the C6's slave 1.4.1),
+  SDIO pins from esp_hosted's `ESP32P4_TAB5_C6_BOARD` preset, cross-checked with M5's demo.
+- C6 power: new optional `muse_board_t.radio_init`, run from `muse_glue_start()` before
+  Home Link starts Wi-Fi, switches on BSP_WIFI_EN. Without it `esp_wifi_init()`'s
+  `ESP_ERROR_CHECK` would abort into a reboot loop.
+- BLE: NimBLE on the P4 over hosted HCI (`ESP_HOSTED_ENABLE_BT_NIMBLE`); `ble_server.c`
+  asks the C6 to enable its controller and logs (not aborts) if slave 1.4.1 refuses.
+- Default volume 30%. `power_off` pulses expander 0x44 pin 4 (M5Unified's PWROFF_PULSE).
+- Host tests: 181 run, OK (2 skipped: no host mbedcrypto), with cJSON fetched temporarily.
+- **Blocked:** `idf.py build` needs components.espressif.com, which this environment's
+  network policy denies.
+
+Open risks for 1.2: esp_hosted 2.12 host vs C6 slave 1.4.1 (Wi-Fi RPCs and BT controller
+requests); BSP 1.3.1 and esp_video on IDF 6.0.1; portrait layout of the Muse UI.

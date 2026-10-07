@@ -617,6 +617,13 @@ static void boot_task(void *arg) {
 
 void muse_glue_start(void) {
     s_ready = xEventGroupCreate();
+    const muse_board_t *board = muse_board_get();
+    if (board->radio_init) {
+        esp_err_t err = board->radio_init();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "radio power-up failed: %s", esp_err_to_name(err));
+        }
+    }
     muse_link_register(&s_ops);
     muse_ble_set_name(identity_ble_name());
     ble_companion_t companion = {

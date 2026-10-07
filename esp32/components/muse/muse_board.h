@@ -69,6 +69,10 @@ typedef struct {
     int frame_ms;           /* face animation period */
     int avatar_px;          /* optional avatar canvas size; 0 uses the UI default */
 
+    /* Powers a radio co-processor (the Tab5's ESP32-C6). Runs from app_main,
+     * before Home Link starts Wi-Fi and BLE and before init. NULL: the radio
+     * is on the chip. */
+    esp_err_t (*radio_init)(void);
     /* Power rails, buses, expanders. Runs first. */
     esp_err_t (*init)(void);
 

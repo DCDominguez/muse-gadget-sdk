@@ -26,7 +26,14 @@
 
 #include "esp_log.h"
 #include "esp_err.h"
+#if CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE
+// The radio is on a co-processor (M5Stack Tab5's ESP32-C6): NimBLE runs here
+// and reaches its controller over esp_hosted's SDIO link.
+#include "esp_hosted.h"
+#include "esp_hosted_misc.h"
+#else
 #include "esp_bt.h"
+#endif
 #include "esp_app_desc.h"
 #include "mbedtls/platform_util.h"
 #include "freertos/FreeRTOS.h"
@@ -791,10 +798,19 @@ void ble_server_full_shutdown(void) {
     s_synced = false;
     s_advertising_active = false;
 
+#if CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE
+    // No local controller to free; switch the co-processor's off instead.
+    err = esp_hosted_bt_controller_disable();
+    if (err == ESP_OK) err = esp_hosted_bt_controller_deinit(false);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "co-processor BT controller off: %s", esp_err_to_name(err));
+    }
+#else
     err = esp_bt_mem_release(ESP_BT_MODE_BLE);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "esp_bt_mem_release: %s", esp_err_to_name(err));
     }
+#endif
 
     ESP_LOGI(TAG, "BLE shut down, memory released");
 }
@@ -953,6 +969,20 @@ void ble_server_start(const char *device_name, const ble_callbacks_t *cb) {
     s_advertising_enabled = false;
     s_advertising_active = false;
 
+#if CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE
+    // esp_hosted leaves the co-processor's controller off until asked.
+    // Older co-processor firmware may not know these requests and keeps its
+    // controller on anyway, so a failure here is logged, not fatal.
+    if (esp_hosted_connect_to_slave() != 0) {
+        ESP_LOGE(TAG, "co-processor link down; BLE unavailable");
+    } else {
+        esp_err_t herr = esp_hosted_bt_controller_init();
+        if (herr == ESP_OK) herr = esp_hosted_bt_controller_enable();
+        if (herr != ESP_OK) {
+            ESP_LOGW(TAG, "co-processor BT controller on: %s", esp_err_to_name(herr));
+        }
+    }
+#endif
     nimble_port_init();
     ble_svc_gap_init();
     ble_svc_gatt_init();
