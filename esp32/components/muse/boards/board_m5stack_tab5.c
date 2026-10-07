@@ -51,6 +51,9 @@
 #include "muse_audio.h"
 #include "muse_dock.h"
 #include "muse_imu.h"
+#if CONFIG_MUSE_TAB5_CAMERA
+#include "tab5_camera.h"
+#endif
 #include "muse_mem.h"
 #include "muse_settings.h"
 
@@ -243,12 +246,23 @@ static void imu_init(void)
     muse_imu_use(imu_read, "BMI270 +-8 g, 200 Hz");
 }
 
+#if CONFIG_MUSE_TAB5_CAMERA
+/* Upright as the Tab5 is held: the Kconfig's turn, and half a turn more flipped. */
+static int camera_rotation(void)
+{
+    return CONFIG_MUSE_TAB5_CAMERA_ROTATION + (s_flipped ? 180 : 0);
+}
+#endif
+
 static esp_err_t init(void)
 {
     ESP_RETURN_ON_ERROR(bsp_i2c_init(), TAG, "i2c init");
     power_init();
     keyboard_bus_init();
     imu_init();
+#if CONFIG_MUSE_TAB5_CAMERA
+    tab5_camera_register(camera_rotation);
+#endif
     return ESP_OK;
 }
 

@@ -193,6 +193,27 @@ menu "Muse"
             memory and preview decoding shares CPU time with voice and Link.
             Leave disabled to build without camera support.
 
+    config MUSE_TAB5_CAMERA
+        bool "M5Stack Tab5: camera.capture"
+        depends on MUSE_BOARD_M5STACK_TAB5 && CAMERA_SC202CS
+        default y
+        help
+            Answer the camera.capture Home Link command with a 640x352 JPEG
+            from the Tab5's SC202CS camera (needs CONFIG_CAMERA_SC202CS, set
+            in the Tab5 overlay). The camera starts on the first capture.
+
+    config MUSE_TAB5_CAMERA_ROTATION
+        int "M5Stack Tab5: camera rotation, degrees counter-clockwise"
+        depends on MUSE_TAB5_CAMERA
+        default 180
+        help
+            Turns each frame upright for the Tab5 held landscape (0, 90, 180
+            or 270); Flip adds 180.
+
+    config MUSE_CAMERA_CAPTURE
+        bool
+        default y if MUSE_WATCHER_CAMERA || MUSE_TAB5_CAMERA
+
     config MUSE_CJK_FONT
         bool "Show Chinese and Japanese in captions"
         depends on MUSE_ENABLED

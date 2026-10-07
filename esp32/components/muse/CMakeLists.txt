@@ -98,6 +98,9 @@ if(CONFIG_MUSE_ENABLED)
         list(APPEND srcs "boards/board_waveshare_s3_lcd7.c")
     elseif(CONFIG_MUSE_BOARD_M5STACK_TAB5)
         list(APPEND srcs "boards/board_m5stack_tab5.c")
+        if(CONFIG_MUSE_TAB5_CAMERA)
+            list(APPEND srcs "boards/tab5_camera.c")
+        endif()
     endif()
 elseif(CONFIG_HOMEHUB_VOICE)
     # The Voice PE board uses just the Hatch voice session; the project's main/
@@ -113,6 +116,11 @@ set(muse_priv_requires
     esp_lcd esp_adc esp_driver_i2s esp_driver_ledc esp_driver_spi esp_driver_uart esp_wifi
     esp_driver_pcnt)
 list(APPEND muse_priv_requires camera)
+if(IDF_TARGET STREQUAL "esp32p4")
+    # The Tab5's camera (tab5_camera.c): requirements are resolved before the
+    # configuration is loaded, so this keys on the target.
+    list(APPEND muse_priv_requires esp_driver_jpeg esp_driver_ppa)
+endif()
 
 idf_component_register(
     SRCS ${srcs}

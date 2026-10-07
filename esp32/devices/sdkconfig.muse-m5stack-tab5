@@ -91,3 +91,8 @@ CONFIG_JD_FASTDECODE_BASIC=y
 # Root R1 cross-signed by GlobalSign Root CA, which IDF's bundle no longer
 # carries on its own (wupsbr/waveshare-muse-gadget-sdk, change 10).
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_CROSS_SIGNED_VERIFY=y
+
+# The camera, for camera.capture (components/muse/boards/tab5_camera.c):
+# SC202CS on MIPI CSI, with the ISP's auto exposure and white balance.
+CONFIG_CAMERA_SC202CS=y
+CONFIG_ESP_VIDEO_ENABLE_ISP_PIPELINE_CONTROLLER=y
