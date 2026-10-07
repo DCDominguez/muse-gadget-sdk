@@ -7,11 +7,11 @@ quick controls in the space around it, and the
 [Tab5 Keyboard](https://docs.m5stack.com/en/tab5/Tab5_Keyboard) as an optional
 keyboard.
 
-> **Status: builds, not yet run on hardware.** Every piece compiles and the
-> SDK's host tests pass, but nothing has booted on a Tab5 yet. Expect the first
-> flashes to find problems. Progress and findings are in
-> [`bringup-log.md`](bringup-log.md); the plan and its safety rules are in
-> [`plan.md`](plan.md).
+> **Status: running on a Tab5 v1.3.** Pairing, Wi-Fi, cloud connection,
+> voice, touch, Flip and physical typing are hardware verified. Battery charging
+> and voltage consistency, the chat on-screen keyboard and emoji support remain
+> open. See [NEXT-STEPS.md](NEXT-STEPS.md) and [bringup-log.md](bringup-log.md).
+
 
 This lives in a fork (`DCDominguez/muse-gadget-sdk`, branch `tab5-port`). It
 isn't part of the upstream SDK; upstream pull requests need Meta's CLA (see
@@ -95,9 +95,9 @@ overlay `devices/sdkconfig.muse-m5stack-tab5`, and the dock
 
 ## Known issues and open risks
 
-1. **Never run on hardware.** The first boot may show a blank or garbled
-   screen (PPA rotation through the patched `esp_lvgl_port` is the first
-   suspect) or taps in the wrong place (press Flip).
+1. **Battery and chat input remain open.** Battery-only startup works, but USB and
+   battery-only voltage readings disagree. The chat keyboard fails to open even
+   after physical keyboard removal; Wi-Fi settings keyboard works.
 2. **C6 compatibility.** esp_hosted 2.12 on the P4 is documented as working
    with the C6's 1.4.1 slave, but this isn't verified. If Wi-Fi fails with an
    incompatible-slave error, updating the C6 is a separate, owner-approved step.

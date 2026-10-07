@@ -38,6 +38,7 @@
 
 #include "bsp/esp-bsp.h"
 #include "driver/i2c_master.h"
+#include "driver/usb_serial_jtag.h"
 #include "esp_check.h"
 #include "esp_io_expander.h"
 #include "esp_log.h"
@@ -105,6 +106,7 @@
 #define HID_SPACE      0x2C
 #define HID_MINUS      0x2D
 #define HID_SLASH      0x38
+#define HID_DELETE     0x4C
 #define HID_RIGHT      0x4F
 #define HID_LEFT       0x50
 #define HID_DOWN       0x51
@@ -132,6 +134,9 @@ static esp_err_t radio_init(void)
     ESP_RETURN_ON_ERROR(bsp_i2c_init(), TAG, "i2c init");
     ESP_RETURN_ON_ERROR(bsp_feature_enable(BSP_FEATURE_WIFI, true), TAG, "C6 power");
     vTaskDelay(pdMS_TO_TICKS(100));
+    uint32_t level = 0;
+    ESP_RETURN_ON_ERROR(esp_io_expander_get_level(bsp_io_expander1_init(), BSP_WIFI_EN, &level), TAG, "C6 power readback");
+    ESP_LOGI(TAG, "C6 power enable readback: %s", (level & BSP_WIFI_EN) ? "high" : "low");
     return ESP_OK;
 }
 
@@ -164,6 +169,16 @@ static void power_init(void)
     }
     s_exp1 = bsp_io_expander1_init();
     if (s_exp1) {
+        /* M5Unified Power_Class::begin(): IO1 G7 CHG_EN high, G5
+         * nCHG_QC_EN low, G4 PWROFF_PLUSE low. The BSP resets this
+         * expander to inputs/all-low, so restore the board power controls.
+         * Set output latches before enabling drivers to avoid an off pulse. */
+        const uint32_t controls = IO_EXPANDER_PIN_NUM_7 | IO_EXPANDER_PIN_NUM_5 | TAB5_PWROFF_PIN;
+        esp_err_t err = esp_io_expander_set_level(s_exp1, controls, 0);
+        if (err == ESP_OK) err = esp_io_expander_set_level(s_exp1, IO_EXPANDER_PIN_NUM_7, 1);
+        if (err == ESP_OK) err = esp_io_expander_set_output_mode(s_exp1, controls, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL);
+        if (err == ESP_OK) err = esp_io_expander_set_dir(s_exp1, controls, IO_EXPANDER_OUTPUT);
+        if (err != ESP_OK) ESP_LOGW(TAG, "battery power controls: %s", esp_err_to_name(err));
         /* An input; nothing else on the board drives it. */
         esp_io_expander_set_dir(s_exp1, TAB5_CHG_STAT_PIN, IO_EXPANDER_INPUT);
     }
@@ -397,6 +412,7 @@ static unsigned kb_event(uint8_t mod, uint8_t usage)
         return 0;
     case HID_ENTER:     muse_dock_key(LV_KEY_ENTER); return 0;
     case HID_BACKSPACE: muse_dock_key(LV_KEY_BACKSPACE); return 0;
+    case HID_DELETE:    muse_dock_key(LV_KEY_DEL); return 0;
     case HID_ESC:       muse_dock_key(LV_KEY_ESC); return 0;
     case HID_LEFT:      muse_dock_key(LV_KEY_LEFT); return 0;
     case HID_RIGHT:     muse_dock_key(LV_KEY_RIGHT); return 0;
@@ -466,6 +482,11 @@ static esp_err_t read_power(muse_power_t *out)
     ESP_RETURN_ON_ERROR(ina_read(INA_REG_BUS, &bus), TAG, "bus voltage");
     ESP_RETURN_ON_ERROR(ina_read(INA_REG_SHUNT, &shunt), TAG, "shunt voltage");
     int pack_mv = bus * 5 / 4;                              /* 1.25 mV per bit */
+    static int previous_mv = -1;
+    if (previous_mv < 0 || abs(pack_mv - previous_mv) >= 100) {
+        ESP_LOGI(TAG, "battery monitor: INA226 raw=0x%04x pack=%d mV", bus, pack_mv);
+        previous_mv = pack_mv;
+    }
     /* 2.5 uV per bit across the shunt; M5's wiring reads charging negative. */
     int charge_ma = -(int)(int16_t)shunt * 5 / 2 / SHUNT_MOHM;
     uint32_t chg = 0;
@@ -478,8 +499,10 @@ static esp_err_t read_power(muse_power_t *out)
         .battery_pct = pack_mv < 3000 ? -1 : pct < 0 ? 0 : pct > 100 ? 100 : pct,
         .battery_mv = pack_mv,
         .charging = charging,
-        /* No VBUS sense: USB is inferred from charge flowing in. */
-        .usb = charging || charge_ma > 20,
+        /* A PC USB connection supplies power even when charging is idle.
+         * Wall chargers have no SOF traffic: retain charge-current detection
+         * for those. There is no direct VBUS sense on this board. */
+        .usb = usb_serial_jtag_is_connected() || charging || charge_ma > 20,
     };
     return ESP_OK;
 }

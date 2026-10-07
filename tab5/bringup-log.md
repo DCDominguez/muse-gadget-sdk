@@ -84,3 +84,31 @@ requests); BSP 1.3.1 and esp_video on IDF 6.0.1; portrait layout of the Muse UI.
   `FLASHING.md` and `SDK-CHANGES.md` added. Kits are built with `tools/make_kit.sh` into
   the gitignored `tab5/kits/`.
 - The Tab5 is listed in `esp32/AGENTS.md`, `esp32/README.md` and `esp32/devices/`.
+
+### Hardware bring-up and user checks (2026-10-07)
+
+- ESP32-P4 v1.3, MAC 80:f1:b2:d1:44:7d, COM4. Kit hashes and original 16 MiB backup verified. Built with ESP-IDF v6.0.1. No C6 firmware or eFuse writes.
+- Fixed startup SDIO mempool assertion: prefer aligned PSRAM, omit unsupported P4 PSRAM DMA capability, retain internal DMA fallback.
+- Fixed active-low SDIO reset: leave C6 reset deasserted before enumeration. Card init and Wi-Fi scan now work.
+- P4 identity now uses factory base MAC instead of nonexistent local Wi-Fi MAC.
+- Initial 60-second capture: no assertions/aborts. Touch, Flip and built-in speaker sample confirmed by owner. Spoken Muse replies subsequently confirmed working.
+- Brownouts during scan/pairing at brightness 100%; reducing brightness to 30% stabilized operation. Owner attached a charged rear battery. BLE pairing completed, Wi-Fi connected, Muse Link Online and cloud transports up.
+- Added physical HID Delete 0x4C -> LV_KEY_DEL and forward deletion in chat. Owner understands Delete versus Backspace behavior.
+- On-screen chat keyboard does not open even after physical keyboard removal; status correctly changes to Keyboard: not connected. Keyboard opens in Other network settings. Fix pending in chat focus/click handling.
+- Emoji display/input support requested, pending.
+- Rear pack reports 69% on its own display; firmware shows 0% and 1.50-1.80 V. Wall charger does not change this. Removing USB turns Tab5 off despite seated rear pack. Battery power path investigation is next; physical failure and firmware initialization have not yet been distinguished.
+- Display correction built but not yet flashed: unknown battery percentage must not be displayed as 0%.
+- Host tests on Windows: 155 run, 22 failures, 7 errors, 2 skipped, including POSIX/ASAN availability and newline differences. Build passed; no clean host-test pass claimed.
+- SDK tokens are excluded from logs and source. Updated firmware kits retain token placeholders only.
+
+#### Battery follow-up implementation
+
+Owner authorized resuming battery investigation. Compared M5Unified Power_Class::begin (https://github.com/m5stack/M5Unified/blob/master/src/utility/Power_Class.inl) with Espressif PI4IOE reset defaults. The BSP resets IO1 to inputs, low output latches; our board restored only radio/status. Added restoration of G7 CHG_EN high, G5 nCHG_QC_EN low, G4 PWROFF_PLUSE low using driver APIs; latch setup precedes enabling output drivers. Added INA226 raw bus/pack voltage logging. Invalid percentage now renders Battery: unavailable with voltage rather than 0%. Build passed, app-only flash initiated; battery power operation still requires hardware validation. These controls cannot establish that a rear pack physically contacts the power terminals.
+
+Battery update flashed at 0x20000, hash verified. Boot sensor read raw 0x055d = 1716 mV; Muse reconnects with wifi/ws/raw up. No power-control API errors. Sensor value remains implausible for a charged 2S pack. Battery-only power-button test requested; not yet confirmed.
+
+Owner battery-only test: Tab5 starts and stays on after unplugging USB and pressing power. Initially reported 6%; next reading 6.48 V / 0%. This is a plausible 2S pack voltage (3.24 V per cell); the existing M5Unified-derived estimate clamps below 3.30 V/cell to 0%. Pack display previously reported 69%, so percentage agreement remains unverified. Owner reports charging on wall outlet but not PC USB; charging/source detection still requires validation. The earlier 1.7 V was not representative of the later battery-only operating state.
+
+USB measurement follow-up: owner requested loading fix after console power JSON showed running=true while COM4 USB was connected. Board read_power now recognizes ESP-IDF USB Serial/JTAG host SOF connection in addition to charger status/current. This fixes PC USB classification when charging is idle. Wall charger detection still relies on charging activity because there is no direct VBUS sense. This changes power classification/runtime measurement, not charge rate or percentage calibration. Build/flash validation pending.
+
+USB detection build and app-only flash passed; write hash verified. 60-second capture: wifi/ws/raw up, no crash/brownout markers. USB power query confirms boot=usb, started=false, running=false: runtime measurement is stopped while on PC USB. Historical saved measurement remains visible as a completed run. Rear pack read around 1.74 V in this USB-connected state; charging and battery-voltage discrepancy remain unresolved beyond the earlier battery-only startup confirmation.

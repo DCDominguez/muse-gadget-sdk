@@ -371,6 +371,9 @@ static void handle_key(uint32_t key)
     case LV_KEY_BACKSPACE:
         lv_textarea_delete_char(s_input);
         break;
+    case LV_KEY_DEL:
+        lv_textarea_delete_char_forward(s_input);
+        break;
     case LV_KEY_ESC:
         lv_textarea_set_text(s_input, "");
         lv_obj_add_flag(s_osk, LV_OBJ_FLAG_HIDDEN);
@@ -506,8 +509,13 @@ static void update_status(void)
     }
 
     muse_power_t p = muse_state_power();
-    if (p.battery_pct < 0 && !p.battery_mv) {
-        lv_label_set_text(s_power, "Battery: not read");
+    if (p.battery_pct < 0) {
+        if (p.battery_mv) {
+            lv_label_set_text_fmt(s_power, "Battery: unavailable  %d.%02d V", p.battery_mv / 1000,
+                                  (p.battery_mv % 1000) / 10);
+        } else {
+            lv_label_set_text(s_power, "Battery: not read");
+        }
     } else {
         lv_label_set_text_fmt(s_power, "Battery: %d%%  %d.%02d V%s%s", p.battery_pct < 0 ? 0 : p.battery_pct,
                               p.battery_mv / 1000, (p.battery_mv % 1000) / 10,

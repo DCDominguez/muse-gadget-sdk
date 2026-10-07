@@ -41,7 +41,14 @@ static char s_device_id[48];
 
 void identity_init(void) {
     uint8_t mac[6] = {0};
-    if (esp_read_mac(mac, ESP_MAC_WIFI_STA) != ESP_OK) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    // The P4 has no local Wi-Fi STA MAC. Use its factory base MAC so device
+    // identity remains stable before the external C6 transport is available.
+    esp_err_t mac_err = esp_efuse_mac_get_default(mac);
+#else
+    esp_err_t mac_err = esp_read_mac(mac, ESP_MAC_WIFI_STA);
+#endif
+    if (mac_err != ESP_OK) {
         ESP_LOGW(TAG, "esp_read_mac failed; using zeros");
     }
     snprintf(s_node_id, sizeof(s_node_id),

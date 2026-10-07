@@ -68,3 +68,20 @@ other boards share, with why and what they do elsewhere. Upstream is
 Tab5, M5Stack CoreS3 and M5Stack Cardputer ADV (no PSRAM, no typed chat)
 build on ESP-IDF 6.0.1. The host tests pass (`python3 -m unittest discover -s
 tests -p 'test_*.py'`: 181 run, 2 skipped for host libraries).
+
+## Hardware bring-up corrections (2026-10-07)
+
+- Tab5 overlay prefers the hosted PSRAM pool. Vendored esp_hosted v2.12.13 uses
+  aligned PSRAM without MALLOC_CAP_DMA for P4 SDIO; internal DMA fallback remains.
+- P4 active-low SDIO reset ends deasserted, allowing C6 card enumeration.
+- P4 identity uses the factory base MAC, avoiding an all-zero local Wi-Fi identity.
+- Physical HID Delete maps to forward deletion in the chat textarea.
+- Battery initialization restores IO1 CHG_EN high, nCHG_QC_EN low and PWROFF low
+  following M5Unified; output latches are set before output drivers. INA226 raw
+  voltage changes are logged. Invalid percentage renders unavailable, not 0%.
+- PC USB detection uses the IDF USB Serial/JTAG connection monitor as well as
+  charger status/current, so runtime measurement does not keep running on PC USB.
+
+These changes built with IDF 6.0.1 and were flashed app-only. Hardware evidence and
+remaining battery limits are in bringup-log.md. Historical host-test results above
+precede this work; the current Windows run is not a clean pass.
