@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cJSON.h"
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
@@ -708,4 +709,24 @@ void muse_glue_led_state(led_state_t state) {
     muse_link_set_state(st);
     // Pairing, provisioning and unpair all move the LED; pick up their config.
     keeper_kick(KEEP_RELOAD);
+}
+
+cJSON *muse_glue_voice_configure(cJSON *params)
+{
+    cJSON *volume = cJSON_GetObjectItem(params, "volume");
+    cJSON *result = cJSON_CreateObject();
+    if (volume && (!cJSON_IsNumber(volume) || volume->valuedouble < 0 || volume->valuedouble > 100)) {
+        cJSON_AddBoolToObject(result, "ok", false);
+        cJSON *error = cJSON_AddObjectToObject(result, "error");
+        cJSON_AddStringToObject(error, "code", "invalid_params");
+        cJSON_AddStringToObject(error, "message", "volume must be 0-100");
+        return result;
+    }
+    if (volume) {
+        muse_settings_set_volume(volume->valueint);
+        ESP_LOGI(TAG, "volume %d (Muse)", volume->valueint);
+    }
+    cJSON_AddBoolToObject(result, "ok", true);
+    cJSON_AddNumberToObject(result, "volume", muse_settings_volume());
+    return result;
 }

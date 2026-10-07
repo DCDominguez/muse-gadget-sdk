@@ -30,3 +30,8 @@ void muse_glue_storage_ready(void);
 void muse_glue_link_ready(void);
 // The LED backend for Muse builds: Link's status, shown on the display.
 void muse_glue_led_state(led_state_t state);
+
+typedef struct cJSON cJSON;
+// voice.configure on a Muse board: the volume Muse's settings keep, so the
+// face, Settings and any dock follow it. Without volume, reports it.
+cJSON *muse_glue_voice_configure(cJSON *params);

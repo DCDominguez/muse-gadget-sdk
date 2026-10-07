@@ -1894,6 +1894,10 @@ static cJSON *on_ws_command(
     if (strcmp(command, "voice.configure") == 0) {
         return voice_configure_command(params);
     }
+#elif CONFIG_MUSE_ENABLED
+    if (strcmp(command, "voice.configure") == 0) {
+        return muse_glue_voice_configure(params);
+    }
 #endif
 #if CONFIG_HOMEHUB_SENSECAP_SENSORS
     if (strcmp(command, "sensors.read") == 0) {

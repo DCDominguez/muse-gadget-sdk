@@ -1355,7 +1355,7 @@ static char *build_register_json(void) {
     }
 #endif
 
-#if CONFIG_HOMEHUB_VOICE
+#if CONFIG_HOMEHUB_VOICE || CONFIG_MUSE_ENABLED
     cJSON *volume_optional = cJSON_CreateObject();
     cJSON *volume_param = cJSON_CreateObject();
     cJSON_AddStringToObject(volume_param, "type", "integer");
