@@ -49,16 +49,17 @@ decide on, is:
 - `--force`, or flashing any file not in this kit.
 
 ## Kokoro speech server (only if I ask for it)
-If I've started Kokoro on this PC (`tab5/KOKORO.md`; `docker ps` shows a
-`kokoro` container):
+If I've started Kokoro on this PC (`KOKORO.md` in this kit; `docker ps` shows
+a `kokoro` container):
 1. Check it answers: `Invoke-WebRequest http://localhost:8880/v1/audio/speech
    -Method Post -ContentType 'application/json' -Body
    '{"model":"kokoro","input":"Hello from Muse.","voice":"af_heart","response_format":"mp3"}'
    -OutFile kokoro-test.mp3` must give a non-empty file.
 2. Find this PC's IPv4 address on the Wi-Fi/Ethernet the Tab5 uses
    (`ipconfig`), and check a firewall rule allows inbound TCP 8880 on Private
-   networks. If none exists, show me the `New-NetFirewallRule` line from
-   `KOKORO.md` to run as administrator; don't change the firewall yourself.
+   networks. If none exists, give me this line to run in an administrator
+   PowerShell; don't change the firewall yourself:
+   `New-NetFirewallRule -DisplayName "Kokoro TTS" -Direction Inbound -Protocol TCP -LocalPort 8880 -Action Allow -Profile Private`
 3. With nothing else on COM4, send the setting and show me the reply:
    `python -c "import serial,time; s=serial.Serial('COM4',115200,timeout=1); s.write(b'>tts=http://<IP>:8880\n'); time.sleep(1.5); print(s.read(4096).decode('utf-8','replace'))"`
    It should print `@tts {"url":"http://<IP>:8880","voice":"af_heart"}`.
