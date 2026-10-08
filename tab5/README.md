@@ -7,10 +7,11 @@ quick controls in the space around it, and the
 [Tab5 Keyboard](https://docs.m5stack.com/en/tab5/Tab5_Keyboard) as an optional
 keyboard.
 
-> **Status: running on a Tab5 v1.3.** Pairing, Wi-Fi, cloud connection,
-> voice, touch, Flip and physical typing are hardware verified. Battery charging
-> and voltage consistency, the chat on-screen keyboard and emoji support remain
-> open. See [NEXT-STEPS.md](NEXT-STEPS.md) and [bringup-log.md](bringup-log.md).
+> **Status (2026-10-09): reboot regression reported after later changes.**
+> Earlier pairing, Wi-Fi/cloud, voice, touch, Flip and physical typing passed.
+> Battery-only operation passed after wall charge, but low readings remain unresolved.
+> Test5 was flashed and reached cloud connection; its new camera/reactions/TTS
+> require feature tests. Read [HANDOFF.md](HANDOFF.md) for current evidence.
 
 
 This lives in a fork (`DCDominguez/muse-gadget-sdk`, branch `tab5-port`). It
@@ -79,6 +80,7 @@ in with the offline form, and flash with `tools/tab5-flash.ps1` (or hand
 
 | | |
 |---|---|
+| [`HANDOFF.md`](HANDOFF.md) | Current session state, provenance, evidence and remaining work |
 | [`plan.md`](plan.md) | The three-phase plan, its gates and safety rules |
 | [`bringup-log.md`](bringup-log.md) | What was found and done, step by step |
 | [`FLASHING.md`](FLASHING.md) | Backup, kit, token, flash, boot log, rollback |
@@ -98,15 +100,14 @@ overlay `devices/sdkconfig.muse-m5stack-tab5`, and the dock
 1. **Battery and chat input remain open.** Battery-only startup works, but USB and
    battery-only voltage readings disagree. The chat keyboard fails to open even
    after physical keyboard removal; Wi-Fi settings keyboard works.
-2. **C6 compatibility.** esp_hosted 2.12 on the P4 is documented as working
-   with the C6's 1.4.1 slave, but this isn't verified. If Wi-Fi fails with an
-   incompatible-slave error, updating the C6 is a separate, owner-approved step.
-3. **BLE pairing through the C6** is the least certain part. If it fails, set
-   Wi-Fi in the build (`CONFIG_HOMEHUB_WIFI_SSID`/`_PASSWORD`) and the Muse
-   token over serial (`hatch.token`) to test without BLE.
+2. **C6 compatibility.** The tested C6 reported version 0.0.0 against host
+   2.12.0 and an optional FeatureControl timeout. Wi-Fi and pairing succeeded;
+   the compatibility warnings remain. No C6 firmware update was performed.
+3. **BLE pairing** succeeded on this unit. Test5 preserved pairing and Wi-Fi;
+   future regressions still require a boot log rather than assuming compatibility.
 4. **Holding Tab to talk:** the keyboard reports releases without saying which
    key, so releasing any key ends the talk.
-5. **USB presence** is inferred from charge current; there's no VBUS sense.
+5. **USB presence** uses USB Serial/JTAG host connection plus charger status/current; wall supplies still rely on charging activity without direct VBUS sense.
 6. **Sleep** is backlight-off only; the P4 doesn't light-sleep yet.
 7. Five Wi-Fi tuning options in the shared `sdkconfig.muse` don't apply under
    `esp_wifi_remote`.

@@ -1,0 +1,34 @@
+Selected evidence from test5 60-second capture, 2026-10-08.
+Not a full log; see HANDOFF.md for limits.
+
+I (680) app_init: App version:      999.0.0
+I (681) app_init: Compile time:     Oct  7 2026 20:00:32
+I (681) app_init: ESP-IDF:          v6.0.1
+I (690) link.main: Muse Gadget starting
+I (1162) muse_imu: BMI270 +-8 g, 200 Hz: shake reaction on
+I (2166) M5Stack Tab5: Discovered board version 2 (LCD ST7123, Touch ST7123, FW 3)
+W (2499) transport: Version mismatch: Host [2.12.0] > Co-proc [0.0.0] ==> Upgrade co-proc to avoid RPC timeouts
+I (2624) board: display 1280x720, rotated 90 degrees
+I (2678) muse_ui: UI up: 800x480, 288 px Muse, 40 ms frames
+I (2678) board: battery monitor: INA226 raw=0x049f pack=1478 mV
+W (7978) rpc_core: Timeout waiting for Resp for [0x183](Req_FeatureControl)
+E (7978) rpc_core: Response not received for [0x183](Req_FeatureControl)
+I (10448) link.wifi: got IP 192.168.0.193
+I (13018) link.heartbeat: hb t=12s setup=done wifi=up ws=down raw=down ble=off int=99K/54K dma=61K/54K psram=27494K tun rx+0/0B tx+0/0B drop+0
+I (14598) link.app: control WebSocket connected
+I (14813) link.noise_ctrl: link.register acked; tunnel may open
+I (14976) link.app: OTA image validated (control WS up)
+I (18020) link.heartbeat: hb t=17s setup=done wifi=up ws=up raw=up ble=off int=115K/62K dma=77K/62K psram=26598K tun rx+0/0B tx+0/0B drop+0
+I (690) link.main: Muse Gadget starting
+I (10448) link.wifi: got IP 192.168.0.193
+I (14598) link.app: control WebSocket connected
+I (14813) link.noise_ctrl: link.register acked; tunnel may open
+I (14976) link.app: OTA image validated (control WS up)
+I (23022) link.heartbeat: hb t=22s setup=done wifi=up ws=up raw=up ble=off int=115K/62K dma=77K/62K psram=26598K tun rx+0/0B tx+0/0B drop+0
+I (28026) link.heartbeat: hb t=27s setup=done wifi=up ws=up raw=up ble=off int=115K/62K dma=77K/62K psram=26597K tun rx+0/0B tx+0/0B drop+0
+I (33028) link.heartbeat: hb t=32s setup=done wifi=up ws=up raw=up ble=off int=115K/62K dma=77K/62K psram=26598K tun rx+0/0B tx+0/0B drop+0
+I (38030) link.heartbeat: hb t=37s setup=done wifi=up ws=up raw=up ble=off int=115K/62K dma=77K/62K psram=26598K tun rx+0/0B tx+0/0B drop+0
+I (43032) link.heartbeat: hb t=42s setup=done wifi=up ws=up raw=up ble=off int=115K/62K dma=77K/62K psram=26598K tun rx+0/0B tx+0/0B drop+0
+I (48034) link.heartbeat: hb t=47s setup=done wifi=up ws=up raw=up ble=off int=115K/62K dma=77K/62K psram=26598K tun rx+0/0B tx+0/0B drop+0
+I (53036) link.heartbeat: hb t=52s setup=done wifi=up ws=up raw=up ble=off int=115K/62K dma=77K/62K psram=26598K tun rx+0/0B tx+0/0B drop+0
+I (58038) link.heartbeat: hb t=57s setup=done wifi=up ws=up raw=up ble=off int=115K/62K dma=77K/62K psram=26598K tun rx+0/0B tx+0/0B drop+0

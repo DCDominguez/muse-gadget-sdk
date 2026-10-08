@@ -121,3 +121,8 @@ Owner reports 57% / 7.5 V after charging, and confirms Tab5 stays on when USB is
 
 Owner reports reboots after later Claude work. Cause and current build are unverified. Test5 reached cloud connection without crash markers during the 2026-10-08 60-second capture; owner then reported depleted battery. See REBOOT-RECOVERY.md for the previously implemented fixes, power evidence and next diagnostics. No flash or code repair performed today.
 
+
+### Session reconciliation (2026-10-09)
+
+HANDOFF.md now consolidates baseline changes, hardware checks, test5 app-only flash, avatar code inspection, unperformed Kokoro setup, depleted-battery report and returned reboots. Test5 documentation/manifest and selected redacted boot evidence are retained under handoffs/test5. Older entries remain historical; current feature status is in HANDOFF.md.
+
