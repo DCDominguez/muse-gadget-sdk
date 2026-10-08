@@ -745,6 +745,15 @@ static bool console_command(char *line, bool whole)
         set_face(line + 5);
         return true;
     }
+    if (!strcmp(line, "imu")) {
+        float a[3], g[3];
+        bool ok = muse_imu_last(a, g);
+        printf("@imu {\"present\":%s,\"a\":[%.2f,%.2f,%.2f],\"gravity\":[%.2f,%.2f,%.2f],\"swing_g\":%.1f}\n",
+               ok ? "true" : "false", (double)a[0], (double)a[1], (double)a[2], (double)g[0], (double)g[1],
+               (double)g[2], (double)MUSE_IMU_SWING_G);
+        fflush(stdout);
+        return true;
+    }
     if (!strncmp(line, "tts", 3) && (!line[3] || line[3] == '=' || !strncmp(line + 3, ".voice=", 7))) {
         tts_command(line + 3);
         return true;

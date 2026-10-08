@@ -137,6 +137,14 @@ esp_err_t muse_imu_init(i2c_master_bus_handle_t bus)
 }
 
 static muse_imu_read_fn s_read;
+static float s_sample[3];       /* the latest reading, for muse_imu_last() */
+
+bool muse_imu_last(float a[3], float gravity[3])
+{
+    memcpy(a, s_sample, sizeof(s_sample));
+    memcpy(gravity, s_gravity, sizeof(s_gravity));
+    return muse_imu_present() && s_settled;
+}
 
 void muse_imu_use(muse_imu_read_fn read, const char *name)
 {
@@ -206,9 +214,10 @@ static bool count_swing(int64_t now_ms)
 bool muse_imu_poll_shake(void)
 {
     float a[3];
-    if (!s_dev || !read_accel(a)) {
+    if (!muse_imu_present() || !read_accel(a)) {
         return false;
     }
+    memcpy(s_sample, a, sizeof(s_sample));
     if (!s_settled) {
         memcpy(s_gravity, a, sizeof(s_gravity));
         s_settled = true;

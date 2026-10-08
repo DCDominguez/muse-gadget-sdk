@@ -42,6 +42,10 @@ void muse_imu_use(muse_imu_read_fn read, const char *name);
 
 bool muse_imu_present(void);
 
+/* The latest sample and the gravity estimate, in g (for the console's
+ * "imu"); false before the first reading or without an IMU. */
+bool muse_imu_last(float a[3], float gravity[3]);
+
 /*
  * Reads one sample and returns true once a vigorous shake has been seen:
  * MUSE_IMU_SHAKE_SWINGS back-and-forth swings of more than MUSE_IMU_SWING_G
