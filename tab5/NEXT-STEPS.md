@@ -1,3 +1,7 @@
+# Current priority — 2026-10-09
+
+Rebooting has returned after later Claude work. Start with [REBOOT-RECOVERY.md](REBOOT-RECOVERY.md): collect reset evidence and compare the established memory, reset and power fixes before adding features. The historical plan below predates test5; camera/IMU/reaction code is in that later kit, but not in this baseline branch.
+
 # Tab5 next steps — 2026-10-07
 
 ## Current verified state
@@ -67,3 +71,4 @@ then the missing chat keyboard and emoji fixes above.
   Earlier low readings remain unexplained; charging and battery operation worked
   in the latest test. Voice and Flip also work. Chat on-screen keyboard and emoji
   remain missing; Wi-Fi Other network keyboard works.
+

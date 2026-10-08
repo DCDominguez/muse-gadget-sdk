@@ -116,3 +116,8 @@ USB detection build and app-only flash passed; write hash verified. 60-second ca
 #### Charging validation after wall charge
 
 Owner reports 57% / 7.5 V after charging, and confirms Tab5 stays on when USB is removed. 7.5 V is consistent with the current voltage-derived 56-57% estimate. Charging and battery-powered operation are verified for this test. Earlier anomalous 1.5-1.8 V readings are retained as historical observations; root cause was not conclusively isolated. Percentage remains a voltage estimate, not a calibrated fuel gauge.
+
+### Reboot regression reported (2026-10-09)
+
+Owner reports reboots after later Claude work. Cause and current build are unverified. Test5 reached cloud connection without crash markers during the 2026-10-08 60-second capture; owner then reported depleted battery. See REBOOT-RECOVERY.md for the previously implemented fixes, power evidence and next diagnostics. No flash or code repair performed today.
+
