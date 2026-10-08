@@ -209,6 +209,14 @@ def scrub(path):
         os.remove(path)
 
 
+SECRET_LINE = re.compile(r"^.*(SDK token|mgst_|xi-api-key|elk_).*$", re.M)
+
+
+def redact(text):
+    """Log text with any line that could show the token or a key replaced."""
+    return SECRET_LINE.sub("[line redacted: may hold a secret]", text)
+
+
 def capture(port, secs, out_path):
     import serial  # comes with esptool
     print(f"capturing the boot log for {secs} s to {out_path} ...", flush=True)
@@ -225,7 +233,7 @@ def capture(port, secs, out_path):
                             asked = True
                         d = s.read(4096)
                         if d:
-                            log.write(d.decode("utf-8", "replace"))
+                            log.write(redact(d.decode("utf-8", "replace")))
                             log.flush()
             except Exception:
                 time.sleep(0.3)                    # the port drops while the board resets
@@ -243,6 +251,9 @@ def main():
     ap.add_argument("--token-file", help="read the token from this file and delete it afterwards")
     ap.add_argument("--key-file", help="ElevenLabs API key for spoken replies, from this file (deleted "
                     "afterwards); without it, a second stdin line, or none")
+    ap.add_argument("--keep-secret-files", action="store_true",
+                    help="keep --token-file and --key-file afterwards (for repeated flashes on your own PC); "
+                         "the patched image is still deleted")
     ap.add_argument("--baud", default="460800")
     ap.add_argument("--log-secs", type=int, default=60)
     ap.add_argument("--log", default=os.path.join(KIT, "tab5-boot.log"))
@@ -266,7 +277,7 @@ def main():
             except OSError:
                 pass
             for path in (a.token_file, a.key_file):
-                if path:
+                if path and not a.keep_secret_files:
                     scrub(path)
         print(f"OTA image: {a.ota_out}. It holds your SDK token: host it privately, over HTTPS.")
         return
@@ -293,9 +304,9 @@ def main():
         except OSError:
             pass
         for path in (a.token_file, a.key_file):
-            if path:
+            if path and not a.keep_secret_files:
                 scrub(path)
-    print("flashed. The token file and patched image are gone.")
+    print("flashed. The patched image is gone" + ("." if a.keep_secret_files else ", and the token file."))
     capture(a.port, a.log_secs, a.log)
 
 
