@@ -49,5 +49,8 @@ void muse_console_camera(void);
 void muse_console_wifi(void);
 /* ">scan": networks heard by a passive scan, then an active one, as "@scan". */
 void muse_console_scan(void);
+/* ">ideas": the ideas Muse pinned to the bulletin board, as "@ideas" JSON;
+ * ">ideas.clear" prints them and takes them down. */
+void muse_console_ideas(bool clear);
 /* A USB host is reading the port. A UART bridge can't tell: false. */
 bool muse_console_host(void);

@@ -699,6 +699,13 @@ __attribute__((weak)) void muse_console_scan(void)
     fflush(stdout);
 }
 
+__attribute__((weak)) void muse_console_ideas(bool clear)
+{
+    (void)clear;
+    printf("@ideas.error unsupported\n");
+    fflush(stdout);
+}
+
 /*
  * "tts" shows the speech server, "tts=URL" sets it ("tts=" clears it) and
  * "tts.voice=NAME" its voice ("tts.voice=" the default). A server with no
@@ -785,6 +792,10 @@ static bool console_command(char *line, bool whole)
     }
     if (!strcmp(line, "scan")) {
         muse_console_scan();
+        return true;
+    }
+    if (!strcmp(line, "ideas") || !strcmp(line, "ideas.clear")) {
+        muse_console_ideas(line[5] == '.');
         return true;
     }
     if (!strncmp(line, "dock=", 5)) {

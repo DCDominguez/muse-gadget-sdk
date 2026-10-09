@@ -214,6 +214,37 @@ static const lv_font_t *chat_font(void)
 /* A label's text as the chat font can draw it: emoji it has stay; other
  * characters it lacks get muse_text's ASCII stand-ins, and variation
  * selectors, joiners and skin tones go, so they don't show as boxes. */
+/*
+ * Muse's replies can carry markers for things only its app shows, such as a
+ * widget: "[[name_widget:ID]]", a token with no spaces inside double square
+ * brackets. They'd show as gibberish, so each becomes a pointer to the app (or
+ * goes, if the pointer wouldn't fit in its place). In place.
+ */
+static void markers_out(char *s)
+{
+    static const char NOTE[] = "(in the Muse app)";
+    char *p = s;
+    while ((p = strstr(p, "[["))) {
+        char *end = strstr(p + 2, "]]");
+        if (!end) {
+            break;
+        }
+        bool token = end > p + 2 && memchr(p + 2, ':', end - p - 2);
+        for (char *c = p + 2; token && c < end; c++) {
+            token = *c != ' ' && *c != '\n';
+        }
+        if (!token) {
+            p += 2;
+            continue;
+        }
+        size_t len = end + 2 - p, note = sizeof(NOTE) - 1;
+        size_t put = len >= note ? note : 0;
+        memcpy(p, NOTE, put);
+        memmove(p + put, end + 2, strlen(end + 2) + 1);
+        p += put;
+    }
+}
+
 static void set_chat_text(lv_obj_t *l, const char *str)
 {
     size_t cap = strlen(str) * 3 / 2 + 4;   /* stand-ins: up to 3 ASCII for 2 bytes */
@@ -223,6 +254,7 @@ static void set_chat_text(lv_obj_t *l, const char *str)
         return;
     }
     strlcpy(shown, str, cap);
+    markers_out(shown);
 #if CONFIG_MUSE_EMOJI_FONT
     muse_text_to_ascii_keeping(shown, cap, emoji_drawable);
 #else

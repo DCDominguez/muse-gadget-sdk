@@ -30,6 +30,9 @@
 #include "freertos/task.h"
 
 #include "app.h"
+#if CONFIG_HOMEHUB_BULLETIN
+#include "bulletin.h"
+#endif
 #include "diagnostic_log.h"
 #include "ble_server.h"
 #include "config_store.h"
@@ -736,6 +739,16 @@ void muse_console_scan(void) {
         printf("@scan {\"error\":\"failed to start the scan task\"}\n");
         fflush(stdout);
     }
+}
+
+void muse_console_ideas(bool clear) {
+#if CONFIG_HOMEHUB_BULLETIN
+    bulletin_console_ideas(clear);
+#else
+    (void)clear;
+    printf("@ideas.error no bulletin board in this build\n");
+    fflush(stdout);
+#endif
 }
 
 void muse_console_wifi(void) {

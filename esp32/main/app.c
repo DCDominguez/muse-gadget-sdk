@@ -68,6 +68,9 @@
 #if CONFIG_HOMEHUB_SENSECAP_SENSORS
 #include "sensecap_sensors.h"
 #endif
+#if CONFIG_HOMEHUB_BULLETIN
+#include "bulletin.h"
+#endif
 #if CONFIG_MUSE_WATCHER_CAMERA
 #include "boards/watcher_camera.h"
 #elif CONFIG_MUSE_CAMERA_CAPTURE
@@ -1935,6 +1938,15 @@ static cJSON *on_ws_command(
 #if CONFIG_HOMEHUB_SENSECAP_SENSORS
     if (strcmp(command, "sensors.read") == 0) {
         return sensecap_sensors_command();
+    }
+#endif
+#if CONFIG_HOMEHUB_BULLETIN
+    if (strcmp(command, "bulletin.read") == 0) {
+        cJSON *bulletin = bulletin_command();
+        return bulletin ? bulletin : command_error("out_of_memory", "failed to build the bulletin");
+    }
+    if (strcmp(command, "bulletin.post") == 0) {
+        return bulletin_post_command(params);
     }
 #endif
     if (strcmp(command, "device.reset_vm") == 0) {

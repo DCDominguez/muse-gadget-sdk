@@ -1378,6 +1378,26 @@ static char *build_register_json(void) {
                 nullptr, nullptr);
 #endif
 
+#if CONFIG_HOMEHUB_BULLETIN
+    add_command(commands, "bulletin.read",
+                "Read this gadget's bulletin board: notes from its owner on "
+                "what's new in the firmware it's running and what's being "
+                "worked on next, and the ideas pinned with bulletin.post. "
+                "Read it when the owner asks what's new or what they're "
+                "working on.",
+                nullptr, nullptr);
+    cJSON *idea_required = cJSON_CreateObject();
+    cJSON_AddItemToObject(idea_required, "idea",
+                          string_param("The idea, in a sentence or a few: 600 bytes at most."));
+    add_command(commands, "bulletin.post",
+                "Pin an idea to this gadget's bulletin board for its owner "
+                "and their developer to build later: a feature, a fix, "
+                "something to try. Use it when the owner asks you to note "
+                "an idea for the gadget. Kept across restarts; the oldest "
+                "go when the board is full (20).",
+                idea_required, nullptr);
+#endif
+
 #if CONFIG_MUSE_CAMERA_CAPTURE
     add_command(commands, "camera.capture",
 #if CONFIG_MUSE_WATCHER_CAMERA
