@@ -16,8 +16,12 @@ limitations under the License.
 
 # Muse Gadgets
 
-> **This fork** adds an experimental port to the M5Stack Tab5 (ESP32-P4) on the
-> `tab5-port` branch: see [`tab5/`](tab5/README.md).
+> **This fork** adds a port to the M5Stack Tab5 (ESP32-P4) on the
+> `tab5-port` branch, redesigned around Cosmo, a pixel-art Muse on a floating
+> island: see [`tab5/`](tab5/README.md), the [manual](tab5/MANUAL.md) and the
+> [changelog](tab5/CHANGELOG.md).
+>
+> <img src="tab5/images/main.png" width="640" alt="Cosmo on the M5Stack Tab5">
 
 <p align="center">
   <picture>

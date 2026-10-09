@@ -1,42 +1,36 @@
-# Handoff (2026-10-08)
+# Handoff (2026-10-10)
 
-Where the Tab5 work stands, for the next session (on the PC with the Tab5:
-read `BRIDGE.md` first).
+Where the Tab5 work stands, for the next session. On the PC with the Tab5,
+read [`BRIDGE.md`](BRIDGE.md) first.
 
-## On the Tab5 now: kit test5 (d2b7c73)
+## On the Tab5 now: kit test33
 
-Hardware results so far (owner): boots, Wi-Fi, Muse connected, BMI270 found;
-rub, tickle and volume drag work. **Shake doesn't**, **images from Muse don't
-show**, **emoji don't render**.
+The pixel UI redesign around Cosmo, work animations driven by Muse's
+activity, settings in a pixel window, the clock and the two-way bulletin
+board. Everything is listed in [CHANGELOG.md](CHANGELOG.md) and how to use
+it in [MANUAL.md](MANUAL.md). Checked on the device by screenshots and real
+requests: a web search showed the globe, an image the easel, and a picture
+pushed with `display.draw_url` appeared after approval in the Muse app.
+Muse pinned an idea with `bulletin.post`, and `>ideas` read it back.
 
-## Since test5, pushed, not yet flashed
+## Working on the device
 
-- `d84a109` **Shake fix**: `muse_imu_poll_shake()` ignored a board reader, so
-  the BMI270 was never polled. Console `>imu` prints live readings.
-- `384dcbe` Bridge: `tools/tab5_console.py`, `tab5_flash.py --keep-secret-files`.
+- Build: `idf.py -B build-muse-m5stack-tab5 build` with ESP-IDF 6.0.1. The
+  build directory's `sdkconfig` holds the owner's settings: the clock's time
+  zone and `CONFIG_LV_USE_SNAPSHOT=y` for screenshots. A fresh build directory
+  needs both set again.
+- Flash a kit app-only (`tools/make_kit.sh testNN`, then `tab5_flash.py` as
+  in [FLASHING.md](FLASHING.md)). Pairing and Wi-Fi survive.
+- Screenshots: `esp32/tools/muse/snap.py COMx ">dock=…" out.png`. Torn rows
+  are USB transfer losses; the tool says "bytes lost", so take it again.
+- If the Tab5 loops in ROM after a flash, only a real power-off (unplug,
+  hold power) clears it.
+- Update [BULLETIN.md](BULLETIN.md) with each build, and read Cosmo's
+  pinned ideas with `>ideas`.
 
-Build a kit (`tools/make_kit.sh test6`, ESP-IDF v6.0.1) or build and flash
-from `esp32/` directly; then run `TESTING.md`.
+## Next
 
-## Open, in order
-
-1. **Images** (`display.draw_url`): nothing shows. Capture the log while asking
-   Muse for a picture (`image_fetch`, `muse_ui` lines). Suspects: the JPEG
-   decode via esp_jpeg on the P4 (`main/image_fetch.c`, `CONFIG_JD_SZBUF`
-   path), the image box at `ui_x`/`ui_y` (`muse_ui_image_draw`), or the cover
-   hiding it.
-2. **Emoji** in the chat: the dock's fonts have no emoji glyphs
-   (`muse_dock.c`). Options: an LVGL emoji image font, or map common emoji to
-   text.
-3. **Shake**: confirm after flashing; if still silent, tune with `>imu`
-   (`MUSE_IMU_SWING_G` 1.2 g may be too high for the Tab5's weight).
-4. **Camera** (`camera.capture`): untested; rotation
-   (`CONFIG_MUSE_TAB5_CAMERA_ROTATION`), RGB565 byte order, possible
-   blocking DQBUF if no frames.
-5. Boot log noise: `ECDSA peripheral not supported on this chip revision`
-   (harmless; the owner declined the overlay change for now), C6 slave
-   reports version 0.0.0 and BT controller enable times out (BLE pairing
-   unavailable; never update the C6 without the owner).
-6. Battery reads 1478 mV (INA226 raw 0x049f): is a pack fitted?
-7. Volume was 97 at boot: feedback risk; check it was intended.
-8. Then: avatar animations and customization (`ROADMAP.md` §4).
+See [NEXT-STEPS.md](NEXT-STEPS.md): check the remaining work animations
+during real requests, the owner's open choices (a bigger Cosmo in full screen,
+scaling up small pictures), and the small fixes (the MAC row, Wi-Fi
+reconnects, the keyboard's case key).

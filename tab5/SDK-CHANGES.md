@@ -148,3 +148,29 @@ tests -p 'test_*.py'`: 181 run, 2 skipped for host libraries).
 These changes built with IDF 6.0.1 and were flashed app-only. Hardware evidence and
 remaining battery limits are in bringup-log.md. Historical host-test results above
 precede this work; the current Windows run is not a clean pass.
+
+## Pixel UI redesign and bulletin board (2026-10-09/10)
+
+Everything below is off for other boards unless noted: the pixel look is
+`CONFIG_MUSE_PIXEL_THEME` (default on only for the Tab5), the bulletin board
+`CONFIG_HOMEHUB_BULLETIN` (likewise), and the dock only exists on a screen
+larger than the board's UI box.
+
+| Where | Change | Other boards |
+|---|---|---|
+| `avatar/muse_pixel.c`, `muse_pixel.h` | `muse_pose_t` gains `facing` (radians, 0 = front) and `walk` (step phase); new `muse_pixel_scale_alpha()` writes alpha for a see-through avatar | `facing` 0 draws exactly as before; a custom avatar without the function gets a weak fallback |
+| `muse_ui.c`, `.h` | See-through avatar over the dock's scenery (RGB565A8 strips); `muse_ui_set_origin()`, `muse_ui_feet()`, `muse_ui_set_motion()` for the wandering; images framed as a polaroid; docked, settings live in the dock's window rather than a tile, and the face's caption, reply and meter overlays are hidden; the pairing card takes the pixel look | Undocked boards: unchanged (the settings tile, captions and answer layouts as before) |
+| `muse_settings_ui.c`, `.h` | Pages size themselves from their container; pixel styling under the theme; `muse_settings_ui_home()`, `muse_settings_ui_open()` | Unchanged without the theme |
+| `muse_dock.c`, `.h`, `muse_scene.c`, `muse_props.c`, `muse_pixel_style.h` | The dock rewritten; scenery, props, shared palette and fonts (new files); `muse_dock_show_settings()` | Not built |
+| `muse_chat_session.cpp` | Logs Muse's `agent.status`/`task.status` and forwards `activity_text` to the console hook as `activity` | Log lines only; no hook, no change |
+| `muse_input.c`, `muse_console.h`, `main/muse_glue.c` | Console `>cam`, `>wifi`, `>scan`, `>ideas[.clear]`, `>dock=…` (weak defaults say unsupported) | Answer "unsupported" |
+| `main/app.c` | Unpair only after 4 refresh rejections over 30 min; `bulletin.read`/`.post` dispatch | Sign-in change applies to every board |
+| `main/noise_control.cpp` | Advertises `bulletin.read` and `bulletin.post` | Only with the option |
+| `main/bulletin.c`, `.h`, `main/CMakeLists.txt`, `main/Kconfig.projbuild` | The bulletin board; the notes file is embedded as `bulletin.md` | Only with the option |
+| `main/wifi_mgr.c`, `.h` | A drop log and passive scans | Shared; behaviour unchanged |
+| `boards/board_m5stack_tab5.c` | Muse area 720×600, avatar 384 px, LVGL task stack 16 KB, camera off at boot | Tab5 only |
+| `muse/Kconfig` | `MUSE_PIXEL_THEME`, `MUSE_CLOCK_TZ` | Defaults off / UTC |
+| `tools/muse/snap.py`, `gen_pixel_fonts.sh` | Big-screen screenshots; the fonts | — |
+
+New host tests: `tests/test_link_bulletin.py`; the unpair and Wi-Fi scan
+contract tests were extended.

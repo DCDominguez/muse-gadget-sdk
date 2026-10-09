@@ -15,12 +15,12 @@ not improvise around a failure: stop and report it.
 1. Close anything using COM4 (miniterm, serial monitors, Arduino IDE).
 2. Check the kit: `Get-FileHash -Algorithm SHA256` on every file named in
    `SHA256SUMS.txt` must match. Stop if any differs.
-3. Confirm the stock backup exists: `%USERPROFILE%\tab5-backups\tab5-80f1b2d1447d-*.bin` (from `tab5-preflight.ps1`),
+3. Confirm the stock backup exists: `%USERPROFILE%\tab5-backups\tab5-<mac>-*.bin` (from `tab5-preflight.ps1`),
    exactly 16777216 bytes. Stop if not.
 4. Run, from this folder, in PowerShell:
    `.\tab5-flash.ps1 -Port COM4`
    (app only: Muse is already on the Tab5, and this keeps its pairing and
-   Wi-Fi. Use `-First` only if I say the Tab5 runs other firmware.) It checks the board (ESP32-P4 v1.x, MAC 80:f1:b2:d1:44:7d) and the backup,
+   Wi-Fi. Use `-First` only if I say the Tab5 runs other firmware.) It checks the board (ESP32-P4 v1.x, with a backup of that very board) and the backup,
    puts my token into the image, signs and verifies it, flashes, then captures
    60 s of log to `tab5-boot.log` (it asks the firmware for the log since
    power-on with `>log`). Flashing takes a few minutes; don't interrupt it.

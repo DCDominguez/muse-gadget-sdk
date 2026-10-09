@@ -114,6 +114,8 @@ def read_key(path):
 
 
 def check_board(port, mac):
+    """Checks the chip and returns its MAC. With `mac`, the board must have it;
+    without, check_backup() still insists on a backup of this very board."""
     out = esptool("--chip", "esp32p4", "-p", port, "chip-id", capture=True)
     if "ESP32-P4" not in out:
         die("the chip on that port isn't an ESP32-P4")
@@ -121,9 +123,14 @@ def check_board(port, mac):
     if not rev or rev.group(1) != "1":
         die("expected a v1.x ESP32-P4 (this build is for pre-v3 silicon)")
     out = esptool("--chip", "esp32p4", "-p", port, "read-mac", capture=True)
-    if mac.lower() not in out.lower():
+    found = re.search(r"MAC:\s*([0-9a-fA-F:]{17})", out)
+    if not found:
+        die("couldn't read the board's MAC")
+    if mac and mac.lower() != found.group(1).lower():
         die(f"MAC isn't {mac}: wrong board")
+    mac = found.group(1).lower()
     print(f"board: ESP32-P4 v{rev.group(1)}.{rev.group(2)}, MAC {mac}")
+    return mac
 
 
 def check_backup(mac, backup_dir):
@@ -253,7 +260,8 @@ def main():
     ap.add_argument("--ota-out", help="write the signed app for device.ota here instead of flashing")
     ap.add_argument("--first", action="store_true",
                     help="first flash: base image at 0x0 (blanks Muse's settings) and the factory-data slot")
-    ap.add_argument("--mac", default="80:f1:b2:d1:44:7d")
+    ap.add_argument("--mac", help="the board's MAC, to refuse any other; without it, the board "
+                    "must have a backup from tab5-preflight.ps1 (named by its MAC)")
     ap.add_argument("--backups", default=os.path.join(os.path.expanduser("~"), "tab5-backups"))
     ap.add_argument("--token-file", help="read the token from this file and delete it afterwards")
     ap.add_argument("--key-file", help="ElevenLabs API key for spoken replies, from this file (deleted "
@@ -290,8 +298,8 @@ def main():
         return
     if not a.port:
         die("--port is required to flash")
-    check_board(a.port, a.mac)
-    check_backup(a.mac, a.backups)
+    mac = check_board(a.port, a.mac)
+    check_backup(mac, a.backups)
     work = tempfile.mkdtemp(prefix="tab5-")
     unsigned = signed = ""
     try:

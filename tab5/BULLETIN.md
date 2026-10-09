@@ -25,7 +25,7 @@ set this Tab5 up. Updated with each test build.
   an open book in your hands, "Generating image" sets up an easel with paint,
   and taking a photo raises a camera to your face. While you write a reply a
   little typewriter clacks out notes.
-- test29: a clock in the status strip, in Philippine time (UTC+8), set over
+- test29: a clock in the status strip, in the owner's time zone, set over
   the network.
 - test26 to test28: settings open in a pixel window on the right, where the
   pocket menu is, and every page matches the pixel style.

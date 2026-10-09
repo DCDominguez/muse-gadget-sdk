@@ -40,7 +40,7 @@ These are the owner's rules; follow them exactly.
 - **Never:** `erase-flash`, anything with eFuses (`espefuse`), Secure Boot or
   flash encryption, writing to the ESP32-C6 (esp_hosted OTA or slave updates),
   `--force`, or flashing anything but a kit's files.
-- **Backups.** `%USERPROFILE%\tab5-backups\tab5-80f1b2d1447d-*.bin` (16 MB)
+- **Backups.** `%USERPROFILE%\tab5-backups\tab5-<mac>-*.bin` (16 MB)
   must exist before any write; `tab5_flash.py` checks.
 - **Reboot loops.** Three `ESP-ROM` banners in a row: stop and report. The
   rollback (`FLASHING.md`) is the owner's call.

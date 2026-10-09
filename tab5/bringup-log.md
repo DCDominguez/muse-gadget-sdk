@@ -1,6 +1,6 @@
 # Tab5 bring-up log
 
-Unit: M5Stack Tab5, MAC `80:f1:b2:d1:44:7d`. No secrets in this file.
+Unit: M5Stack Tab5, MAC on file (kept out of the repo). No secrets in this file.
 
 ## Gate 1.0 preflight (2026-10-07) — approved by the owner
 
@@ -87,7 +87,7 @@ requests); BSP 1.3.1 and esp_video on IDF 6.0.1; portrait layout of the Muse UI.
 
 ### Hardware bring-up and user checks (2026-10-07)
 
-- ESP32-P4 v1.3, MAC 80:f1:b2:d1:44:7d, COM4. Kit hashes and original 16 MiB backup verified. Built with ESP-IDF v6.0.1. No C6 firmware or eFuse writes.
+- ESP32-P4 v1.3, COM4. Kit hashes and original 16 MiB backup verified. Built with ESP-IDF v6.0.1. No C6 firmware or eFuse writes.
 - Fixed startup SDIO mempool assertion: prefer aligned PSRAM, omit unsupported P4 PSRAM DMA capability, retain internal DMA fallback.
 - Fixed active-low SDIO reset: leave C6 reset deasserted before enumeration. Card init and Wi-Fi scan now work.
 - P4 identity now uses factory base MAC instead of nonexistent local Wi-Fi MAC.

@@ -95,7 +95,7 @@ RGB565 byte order needs swapping; say so.
 | # | Test | Pass when |
 |---|---|---|
 | 5b.1 | `>wifi` | `@wifi {...}`: connected, RSSI and channel; `drops` counts drops from a working connection; `recent` lists the last 8 with uptime `t_s`, `reason` (ESP-IDF `wifi_err_reason_t`), `rssi` and `back_ms` (time to the next IP; -1 while still down) |
-| 5b.1a | `>scan` `[new]` | `@scan {"passive":[...],"active":[...]}` lists the networks heard. During an outage: `mochimesh` in `passive` but not `active` means the router ignores this Tab5's probes; in neither, its 2.4 GHz side is silent |
+| 5b.1a | `>scan` `[new]` | `@scan {"passive":[...],"active":[...]}` lists the networks heard. During an outage: your network in `passive` but not `active` means the router ignores this Tab5's probes; in neither, its 2.4 GHz side is silent |
 | 5b.2 | After a drop | Before restarting, run `>wifi` and `>log`: the reason and how long the way back took |
 
 ## 6. Power
@@ -107,6 +107,22 @@ RGB565 byte order needs swapping; say so.
 | 6.3 | Sleep button, then a touch or a key | Screen off, then back with the waking reaction |
 | 6.4 | Shake while asleep `[new]` | Screen wakes |
 | 6.5 | Hold Off 1.5 s on battery | Powers off (on USB it stays on) |
+
+## 7. Pixel UI and bulletin board `[new]`
+
+How each should look: [MANUAL.md](MANUAL.md). `>dock=...` shows a state
+without touching the screen; `esp32/tools/muse/snap.py` screenshots it.
+
+| # | Test | Pass when |
+|---|---|---|
+| 7.1 | Leave Cosmo idle a minute | He strolls, stargazes, looks around or daydreams, and walks home when you talk |
+| 7.2 | Ask Muse to search the web, research something, make an image | The globe, the book, the easel, with the mood line to match (`@chat` `activity` lines name the work) |
+| 7.3 | Ask Muse to put a picture on the Tab5, approve it in the app | It appears in a pixel polaroid; a tap or talking puts it away |
+| 7.4 | Pocket, then Settings; each page; a Wi-Fi password field | A pixel window on the right; no crash; the keyboard types |
+| 7.5 | Full screen, then back | Chat hides and returns; Cosmo stays on his island |
+| 7.6 | Status strip after Wi-Fi connects | The clock shows local time within a minute |
+| 7.7 | Ask "what's new on the Tab5?" | Muse reads `bulletin.read` and answers from `BULLETIN.md` |
+| 7.8 | Ask Muse to pin an idea to the Tab5 board, then `>ideas` | `link.noise_ctrl: invoke request: command=bulletin.post`, then `@ideas` lists it |
 
 ## Reporting
 

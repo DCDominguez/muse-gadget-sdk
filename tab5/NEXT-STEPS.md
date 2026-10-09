@@ -27,7 +27,7 @@ Muse's activity, captured 2026-10-10 (agent.status payload): activity_code is on
 responding", with an optional activity_emoji. task.status carries running,
 completed and user_denied (a permission the Muse app asked for and didn't get).
 The dock picks Cosmo's prop from activity_text (research before search).
-Clock: SNTP once Wi-Fi is up, CONFIG_MUSE_CLOCK_TZ (the owner's build: "PHT-8").
+Clock: SNTP once Wi-Fi is up, CONFIG_MUSE_CLOCK_TZ (set in the owner's build directory).
 
 Open choices: 2x scaling for small pictures, bigger Cosmo in full screen.
 Settings' MAC address row is empty on the P4 (no local Wi-Fi MAC; pre-existing).
