@@ -54,6 +54,15 @@ if(CONFIG_MUSE_ENABLED)
     if(CONFIG_MUSE_CJK_FONT)
         list(APPEND srcs "fonts/muse_font_cjk_16.c")   # captions' CJK fallback
     endif()
+    if(CONFIG_MUSE_EMOJI_FONT)
+        list(APPEND srcs "fonts/muse_font_emoji_16.c")   # the dock chat's emoji fallback
+    endif()
+    if(CONFIG_MUSE_PIXEL_THEME)
+        # the dock's pixel look: Pixelify Sans and Silkscreen
+        list(APPEND srcs "fonts/muse_font_pixel_19.c" "fonts/muse_font_pixel_30.c" "fonts/muse_font_label_16.c"
+             "muse_scene.c"     # the night sky and island behind a see-through Muse
+             "muse_props.c")    # Cosmo's work props, in Muse's own pixel style
+    endif()
     # Your own character (tools/muse/AVATAR_RECIPE.md) stands in for the default
     # avatar when avatar/muse_pixel.c exists here; this avatar/ is gitignored. The
     # default is in avatar/ at the top of the project.

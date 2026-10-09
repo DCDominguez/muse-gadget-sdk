@@ -16,16 +16,18 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "lvgl.h"
 
 /*
  * The space around Muse on a panel larger than the board's UI box (the Tab5's
- * 1280x720 around an 800x480 Muse). The column beside Muse shows status and a
- * typed chat with Muse; the strip below holds a hold-to-talk button and quick
- * controls (volume, brightness, sleep, flip, power). With no keyboard
- * attached, an on-screen one opens over the strip for typing.
+ * 1280x720 around a 720x600 Muse). The column beside Muse holds a typed chat;
+ * over Muse's stage go a status strip, Muse's name and mood, hold-to-talk and
+ * the pocket of quick controls (volume, brightness, nap, flip, camera,
+ * settings, full screen, power). With no keyboard attached, an on-screen one
+ * opens over the bottom of the stage for typing.
  */
 
 /* Builds the dock on `scr` around the UI box. In the LVGL task. */
@@ -38,3 +40,10 @@ void muse_dock_build(lv_obj_t *scr, int ui_x, int ui_y, int ui_w, int ui_h);
  * is empty and the Muse app is waiting for the press.
  */
 void muse_dock_key(uint32_t key);
+
+/* In the LVGL task: ">dock=pocket", "full", "demo" or "osk" from the console,
+ * to show the dock's states without touching the screen. */
+void muse_dock_command(const char *what);
+
+/* In the LVGL task: open or close the settings, in a window where the chat goes. */
+void muse_dock_show_settings(bool show);

@@ -116,3 +116,14 @@ USB detection build and app-only flash passed; write hash verified. 60-second ca
 #### Charging validation after wall charge
 
 Owner reports 57% / 7.5 V after charging, and confirms Tab5 stays on when USB is removed. 7.5 V is consistent with the current voltage-derived 56-57% estimate. Charging and battery-powered operation are verified for this test. Earlier anomalous 1.5-1.8 V readings are retained as historical observations; root cause was not conclusively isolated. Percentage remains a voltage estimate, not a calibrated fuel gauge.
+
+#### 2026-10-09/10: pixel UI redesign
+
+Kits test13–test28 flashed app-only (NVS kept). Each boot captured: no panics, Wi-Fi
+and Muse reconnect. Work props, settings pages, pocket and chat checked by on-device
+LVGL snapshots. test26 crashed opening the settings Wi-Fi page (Stack protection
+fault in the LVGL task, lv_draw under a deep widget tree at the port's 7 KB default);
+test27 raised the Tab5 LVGL task stack to 16 KB and all eight settings pages then
+opened cleanly. ROM boot loop after some flashes still needs a real power-off
+(unplug USB, then hold the power button). Windows host tests: link Wi-Fi scan contract green; the
+unpair and caption tests fail only on Windows temp cleanup and CRLF as before.

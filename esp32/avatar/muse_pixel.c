@@ -455,6 +455,7 @@ typedef struct {
     float fa, fb;   /* face panel half extents */
     float shear;    /* x shift per px above `pivot` (sways about the feet); 0 = upright */
     float pivot;
+    bool face;      /* the face panel shows: false from behind, all hood */
 } avatar_t;
 
 /* Per-row parts of the body and face fields, in Q12. */
@@ -608,7 +609,7 @@ static void draw_avatar(const avatar_t *j, const limb_t arms[2], const limb_t fe
                 int32_t fu2 = (fu * fu) >> Q;
                 int32_t ff = ((fu2 * fu2) >> Q) + row.fv4;
                 int32_t b = bayer_q(x, y);
-                if (ff <= ONE) {
+                if (j->face && ff <= ONE) {
                     s_mask[y * W + x] = M_FACE;
                     int32_t fv = row.fv, fv1 = fv + QF(0.15f);
                     uint8_t c = C_SKIN;
@@ -623,7 +624,7 @@ static void draw_avatar(const avatar_t *j, const limb_t arms[2], const limb_t fe
                 } else {
                     s_mask[y * W + x] = M_BODY;
                     /* Fur darkens where it tucks around the face. */
-                    if (ff < QF(1.75f) && (ff < QF(1.3f) || b < ((QF(1.75f) - ff) * QF(1.4f)) >> Q)) {
+                    if (j->face && ff < QF(1.75f) && (ff < QF(1.3f) || b < ((QF(1.75f) - ff) * QF(1.4f)) >> Q)) {
                         px(x, y, ff < QF(1.3f) ? C_OUT2 : C_BD);
                     } else {
                         px(x, y, fur((ux * QF(0.95f)) >> Q, (uy * QF(0.95f)) >> Q, x, y, ox, oy));
@@ -1386,6 +1387,27 @@ void muse_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int 
     }
 }
 
+void muse_pixel_scale_alpha(uint8_t *dst, int stride_px, int x0, int x1, int y0, int y1)
+{
+    int n = x1 - x0 + 1;
+    const uint8_t *xmap = &s_map[x0];
+    const uint8_t *prev = NULL;
+    uint8_t prev_m = 0;
+    for (int y = y0; y <= y1; y++, dst += stride_px) {
+        uint8_t m = s_map[y];
+        if (prev && (m & 0x7f) == (prev_m & 0x7f)) {
+            memcpy(dst, prev, n);
+            continue;
+        }
+        const uint8_t *row = &s_fb[(m & 0x7f) * W];
+        for (int i = 0; i < n; i++) {
+            dst[i] = row[xmap[i] & 0x7f] == C_BG ? 0 : 255;
+        }
+        prev = dst;
+        prev_m = m;
+    }
+}
+
 void muse_pixel_render(const muse_pose_t *p)
 {
     static bool s_luts;
@@ -1438,6 +1460,9 @@ void muse_pixel_render(const muse_pose_t *p)
     if (happy > 0) {
         hop = fabsf(sinf(t * 9.0f)) * 3.0f * happy;
     }
+    if (p->walk > 0) {
+        bob -= p->walk * fabsf(sinf(t * 9.0f)) * 1.2f;   /* a little lift with each step */
+    }
 
     /* Boot: the avatar pops up from a squash, then opens their eyes. */
     float boot = mode == MUSE_MODE_BOOT ? clampf(p->mode_t / 1.4f, 0, 1) : 1.0f;
@@ -1465,6 +1490,15 @@ void muse_pixel_render(const muse_pose_t *p)
         j.fy += re.face_dy;
         j.pivot = j.cy + j.b;
         j.shear = re.sway / (2 * j.b);
+    }
+    /* Turned: the face panel slides towards the side Muse faces and narrows;
+     * from behind there's only hood. Facing 0 draws Muse as always. */
+    float cf = cosf(p->facing), sf = sinf(p->facing);
+    bool turned = p->facing != 0;
+    j.face = cf > -0.3f;
+    if (turned) {
+        j.fx += sf * j.a * 0.52f;
+        j.fa *= 0.4f + 0.6f * fabsf(cf);
     }
 
     /* ---- background layers ---- */
@@ -1498,6 +1532,14 @@ void muse_pixel_render(const muse_pose_t *p)
     float step = mode == MUSE_MODE_SPEAKING ? sinf(t * 5.0f) * 0.6f : 0.0f;
     feet[0] = (limb_t){ j.cx - 7.0f, base - 0.5f + (happy > 0 ? hop * 0.3f : step), -0.15f };
     feet[1] = (limb_t){ j.cx + 7.0f, base - 0.5f + (happy > 0 ? hop * 0.3f : -step), 0.15f };
+    if (turned || p->walk > 0) {
+        /* Feet close in as Muse turns side-on, and step in turn when walking. */
+        for (int i = 0; i < 2; i++) {
+            float off = feet[i].x - j.cx;
+            feet[i].x = j.cx + off * (0.45f + 0.55f * fabsf(cf)) + sf * 1.5f;
+            feet[i].y -= p->walk * fmaxf(0.0f, sinf(t * 9.0f + i * 3.1416f)) * 1.6f;
+        }
+    }
     if (react) {
         /* Sitting: feet splay out in front. The hop lifts them with the body. */
         float fo = re.feet_out;
@@ -1560,6 +1602,16 @@ void muse_pixel_render(const muse_pose_t *p)
             arms[i].x += j.shear * (j.pivot - arms[i].y);   /* ride along with the lean */
         }
     }
+    if (turned || p->walk > 0) {
+        for (int i = 0; i < 2; i++) {
+            float off = arms[i].x - j.cx;
+            arms[i].x = j.cx + off * (0.4f + 0.6f * fabsf(cf)) + sf * 2.0f;
+            arms[i].angle += p->walk * sinf(t * 9.0f) * 0.4f * (i ? 1.0f : -1.0f);   /* swing */
+        }
+        if (fabsf(sf) > 0.55f) {
+            arms[sf > 0 ? 0 : 1].x = -1000.0f;   /* side-on, the far arm is behind Muse */
+        }
+    }
     draw_avatar(&j, arms, feet);
 
     /* ---- face ---- */
@@ -1603,20 +1655,22 @@ void muse_pixel_render(const muse_pose_t *p)
     }
 
     bool react_drawn = false;
-    if (react) {
+    if (react && j.face) {
         float off = j.shear * (j.pivot - (eye_y + 2));
         draw_blush(iround(j.fx + off - j.fa * 0.72f), iround(eye_y + 2), re.blush);
         draw_blush(iround(j.fx + off + j.fa * 0.72f), iround(eye_y + 2), re.blush);
         react_drawn = react_face(&re, &j, eye_y, eye_dx, blink, s_eyes.gx * re.gaze, s_eyes.gy * re.gaze);
     }
-    if (!react_drawn) {
+    if (!react_drawn && j.face) {
         draw_eye(j.fx - eye_dx, eye_y, open, style, s_eyes.gx, s_eyes.gy);
         draw_eye(j.fx + eye_dx, eye_y, open, style, s_eyes.gx, s_eyes.gy);
     }
 
     /* Tiny brows for the expressive states. */
     int bl = iround(j.fx - eye_dx), br = iround(j.fx + eye_dx), by = iround(eye_y) - 4;
-    if (mode == MUSE_MODE_THINKING) {
+    if (!j.face) {
+        /* no brows from behind */
+    } else if (mode == MUSE_MODE_THINKING) {
         px(bl - 1, by + 1, C_BROW); px(bl, by + 1, C_BROW);
         px(br - 1, by, C_BROW); px(br, by - 1, C_BROW);
     } else if (mode == MUSE_MODE_LISTENING) {
@@ -1625,7 +1679,7 @@ void muse_pixel_render(const muse_pose_t *p)
     }
 
     float blush = 0.55f + happy * 0.45f + (mode == MUSE_MODE_SPEAKING ? 0.15f : 0.0f);
-    if (!react_drawn) {
+    if (!react_drawn && j.face) {
         draw_blush(iround(j.fx - j.fa * 0.72f), iround(eye_y + 2), blush);
         draw_blush(iround(j.fx + j.fa * 0.72f), iround(eye_y + 2), blush);
         draw_mouth(iround(j.fx), iround(eye_y + 3), mouth, mouth_open);

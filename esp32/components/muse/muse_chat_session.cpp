@@ -1508,6 +1508,31 @@ static void on_event(cJSON *line)
     if (!strcmp(event, "agent.status") || !strcmp(event, "task.status")) {
         const char *code = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "activity_code"));
         const char *status = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "status"));
+        /* What kind of work it is (researching, searching, an image...): logged
+         * when it changes, so Cosmo's work animations can follow the real codes. */
+        {
+            static char last[48];
+            char now[48];
+            snprintf(now, sizeof(now), "%s/%s", code ? code : "-", status ? status : "-");
+            if (strcmp(now, last)) {
+                strlcpy(last, now, sizeof(last));
+                const char *label = nullptr;
+                for (const char *k : { "label", "title", "tool", "tool_name", "kind", "phase" }) {
+                    label = cJSON_GetStringValue(cJSON_GetObjectItem(payload, k));
+                    if (label) {
+                        ESP_LOGI(TAG, "activity: %s %s (%s=%.40s)", event, now, k, label);
+                        break;
+                    }
+                }
+                if (!label) {
+                    ESP_LOGI(TAG, "activity: %s %s", event, now);
+                }
+                /* To the dock too, which picks Cosmo's work animation from it. */
+                char what[96];
+                snprintf(what, sizeof(what), "%s %s", now, label ? label : "");
+                muse_hatch_console("activity", what, nullptr);
+            }
+        }
         bool was = s_turn.agent_busy;
         if (code) {
             s_turn.agent_busy = code[0] && strcmp(code, "online") && strcmp(code, "idle");

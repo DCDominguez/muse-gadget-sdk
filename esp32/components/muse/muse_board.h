@@ -107,6 +107,12 @@ typedef struct {
      * restarts), and whether an external keyboard answers. */
     void (*flip_display)(void);
     bool (*keyboard_present)(void);
+    /* Optional, for muse_dock: the owner's camera switch (kept across
+     * restarts). Off, camera.capture is refused. */
+    bool (*camera_enabled)(void);
+    void (*set_camera_enabled)(bool on);
+    /* While a photo is being taken and briefly after: the dock shows it. */
+    bool (*camera_in_use)(void);
     /* Turns the board off; returns only on failure. */
     esp_err_t (*power_off)(void);
 } muse_board_t;

@@ -16,9 +16,20 @@
 
 #pragma once
 
+#include <stdbool.h>
+
 /*
  * Registers the Tab5's camera with the SDK's camera component, for
  * camera.capture. rotation() gives the degrees (counter-clockwise) to turn
  * each frame so it's upright the way the Tab5 is held.
  */
 void tab5_camera_register(int (*rotation)(void));
+
+/* The owner's switch for the camera (muse_dock's button), kept across
+ * restarts; off until turned on. Off, a capture is refused before the camera
+ * is powered, and Muse is told it's turned off. */
+bool tab5_camera_enabled(void);
+void tab5_camera_set_enabled(bool on);
+
+/* While a capture runs and for 2 s after, for muse_dock's on-screen notice. */
+bool tab5_camera_in_use(void);

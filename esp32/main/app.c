@@ -133,6 +133,15 @@ static int64_t s_last_periodic_token_refresh_us = 0;
 static bool s_sdk_token_report_attempted = false;
 static int64_t s_vm_auth_refresh_interval_us = VM_AUTH_REFRESH_RETRY_INTERVAL_US;
 static uint8_t s_vm_auth_refusals = 0;
+// Refresh-token rejections in a row, and when the first was. A device the
+// owner removed stays rejected; one that only hit a server hiccup (or a
+// rotation lost to a restart) recovers. So the pairing is cleared only after
+// several rejections spread over a while, never on the first, and the device
+// doesn't restart into a pairing loop over a passing failure.
+static uint8_t s_refresh_rejections = 0;
+static int64_t s_first_refresh_rejection_us = 0;
+#define REVOKE_AFTER_REJECTIONS 4
+#define REVOKE_AFTER_US (30LL * 60 * 1000 * 1000)
 static bool s_vm_auth_refresh_pending = false;
 static atomic_bool s_setup_reset_pending = ATOMIC_VAR_INIT(false);
 static bool s_ble_started = false;
@@ -853,6 +862,7 @@ static bool ensure_access_token_ready_with_gate_held(
 
     bool ok = false;
     bool revoked = false;
+    bool rejected = false;
     char *access = NULL;
     char *refresh = NULL;
 
@@ -912,6 +922,7 @@ static bool ensure_access_token_ready_with_gate_held(
         ok = store_token_pair_unlocked(tokens.access_token, tokens.refresh_token);
         vm_device_tokens_free(&tokens);
         ESP_LOGI(TAG, "device token refresh stored (method=%d)", (int)method);
+        s_refresh_rejections = 0;
         goto done;
     }
     vm_device_tokens_free(&tokens);
@@ -919,6 +930,18 @@ static bool ensure_access_token_ready_with_gate_held(
         if (allow_stale_on_refresh_failure) {
             ESP_LOGW(TAG, "device token refresh rejected; keeping stale token");
             ok = true;
+            goto done;
+        }
+        int64_t now = esp_timer_get_time();
+        if (s_refresh_rejections == 0) s_first_refresh_rejection_us = now;
+        if (s_refresh_rejections < UINT8_MAX) s_refresh_rejections++;
+        if (s_refresh_rejections < REVOKE_AFTER_REJECTIONS
+            || now - s_first_refresh_rejection_us < REVOKE_AFTER_US) {
+            ESP_LOGW(TAG, "device token refresh rejected (%u in a row over %d s); keeping the pairing for now",
+                     (unsigned)s_refresh_rejections,
+                     (int)((now - s_first_refresh_rejection_us) / 1000000));
+            rejected = true;
+            ok = false;
             goto done;
         }
         handle_token_revoked_unlocked("device token refresh");
@@ -935,6 +958,8 @@ done:
     auth_lock_give();
     if (revoked) {
         defer_token_revocation_reset();
+    } else if (rejected) {
+        ui_set_status("auth_failed");   // shown; no reset, no restart
     }
     return ok;
 }
@@ -1582,6 +1607,7 @@ static void watcher_camera_capture_task(void *arg) {
         cJSON *failure = cJSON_AddObjectToObject(result, "error");
         cJSON_AddStringToObject(failure, "code", "camera_capture_failed");
         cJSON_AddStringToObject(failure, "message", error ? error : "camera capture failed");
+        ESP_LOGW(TAG, "camera.capture failed: %s", error ? error : "camera capture failed");
     }
     free(image);
     noise_ctrl_send_command_result(args->session_generation, args->request_id, result);

@@ -19,7 +19,9 @@
  *   console    stdin is a reply's text: prints the lines a typed turn sends for it
  *   unescape   stdin is console lines: prints each unescaped, as "<length>:<bytes>"
  *   caption C  stdin is a reply's text: prints it wrapped to C columns, as the
- *              screen pages it (test_muse_caption_wrap.py) */
+ *              screen pages it (test_muse_caption_wrap.py)
+ *   keep       stdin is chat text: prints it as the dock shows it with an emoji
+ *              font holding only the emoticons block (test_muse_caption_wrap.py) */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,6 +29,7 @@
 #include "muse_chat.h"
 #include "muse_chat_priv.h"
 #include "muse_state.h"
+#include "muse_text.h"
 
 /* Captions page to the screen; the console lines tested here don't. */
 static int s_cols = 16, s_lines = 2;
@@ -36,6 +39,13 @@ void muse_state_page(bool cjk, int *cols, int *lines)
     (void)cjk;
     *cols = s_cols;
     *lines = s_lines;
+}
+
+/* "keep": a fallback font with only the emoticons block, as the dock's
+ * emoji font might be. */
+static bool keep_emoticons(uint32_t cp)
+{
+    return cp >= 0x1F600 && cp <= 0x1F64F;
 }
 
 static char *read_all(size_t *len)
@@ -93,8 +103,26 @@ int main(int argc, char **argv)
         if (muse_hatch_caption_at(in, 0, page, sizeof(page))) {
             fputs(page, stdout);
         }
+    } else if (argc > 1 && !strcmp(argv[1], "keep")) {
+        size_t cap = len * 3 / 2 + 4;
+        char *shown = malloc(cap);
+        if (!shown) {
+            return 2;
+        }
+        strcpy(shown, in);
+        muse_text_to_ascii_keeping(shown, cap, keep_emoticons);
+        fputs(shown, stdout);
+        free(shown);
+    } else if (argc > 1 && !strcmp(argv[1], "overlap")) {
+        /* stdin: the shown text, a newline, the next caption; prints the bytes that repeat. */
+        char *next = strchr(in, '\n');
+        if (!next) {
+            return 2;
+        }
+        *next++ = '\0';
+        printf("%zu", muse_text_overlap(in, next, 8));
     } else {
-        fprintf(stderr, "usage: %s console|unescape|caption COLS < input\n", argv[0]);
+        fprintf(stderr, "usage: %s console|unescape|caption COLS|keep|overlap < input\n", argv[0]);
         return 2;
     }
     free(in);

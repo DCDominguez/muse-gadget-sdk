@@ -34,6 +34,11 @@
 #include "ble_server.h"
 #include "config_store.h"
 #include "identity.h"
+#include "image_fetch.h"
+#if CONFIG_MUSE_CAMERA_CAPTURE
+#include "camera.h"
+#include "esp_heap_caps.h"
+#endif
 #include "noise_control.h"
 #include "stack_monitor.h"
 #include "wifi_known.h"
@@ -635,6 +640,117 @@ void muse_console_dump_log(void) {
     printf("\n@log end\n");
     fflush(stdout);
     diagnostic_log_snapshot_free(&snap);
+}
+#endif
+
+#if CONFIG_HOMEHUB_DISPLAY_COMMANDS
+// ">img=URL" on the Muse console: display.draw_url without Muse, for bench
+// tests. Prints "@img" with the result once the image is drawn.
+static void console_image_done(const image_fetch_result_t *r, void *user) {
+    (void)user;
+    if (r->ok) {
+        printf("@img {\"ok\":true,\"format\":\"%s\",\"width\":%d,\"height\":%d,\"scale\":%d,"
+               "\"bytes\":%u,\"ms\":%d}\n",
+               r->format, r->width, r->height, r->scale, (unsigned)r->bytes, r->ms);
+    } else {
+        printf("@img {\"ok\":false,\"code\":\"%s\",\"message\":\"%s\",\"bytes\":%u,\"ms\":%d}\n",
+               r->code, r->message, (unsigned)r->bytes, r->ms);
+    }
+    fflush(stdout);
+}
+
+#if CONFIG_MUSE_CAMERA_CAPTURE
+// ">cam": camera.capture without Muse, on a task of its own as the command
+// runs. Prints "@cam" with the photo's size or the reason it failed.
+static void console_camera_task(void *arg) {
+    (void)arg;
+    int64_t t0 = esp_timer_get_time();
+    const char *error = NULL;
+    char *image = camera_capture_base64(&error);
+    int ms = (int)((esp_timer_get_time() - t0) / 1000);
+    if (image) {
+        size_t b64 = strlen(image);
+        printf("@cam {\"ok\":true,\"jpeg_bytes\":%u,\"ms\":%d}\n", (unsigned)(b64 / 4 * 3), ms);
+        free(image);
+    } else {
+        printf("@cam {\"ok\":false,\"message\":\"%s\",\"ms\":%d}\n", error ? error : "camera capture failed", ms);
+    }
+    fflush(stdout);
+    vTaskDeleteWithCaps(NULL);
+}
+
+void muse_console_camera(void) {
+    if (xTaskCreateWithCaps(console_camera_task, "console_cam", 8192, NULL, 4, NULL,
+                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
+        printf("@cam {\"ok\":false,\"message\":\"failed to start the capture task\"}\n");
+        fflush(stdout);
+    }
+}
+#endif
+
+// ">scan": a passive scan, then an active one, over every channel. A network
+// in the first list but not the second hears beacons but doesn't answer this
+// station's probes (a mesh steering it, say).
+#define CONSOLE_SCAN_MAX 24
+static void print_scan(const char *name, const wifi_scan_entry_t *e, int n) {
+    printf("\"%s\":", name);
+    if (n < 0) {
+        printf("\"busy\"");
+        return;
+    }
+    printf("[");
+    for (int i = 0; i < n; i++) {
+        char ssid[2 * sizeof(e[i].ssid)];
+        size_t k = 0;
+        for (const char *s = e[i].ssid; *s && k + 2 < sizeof(ssid); s++) {
+            if (*s == '"' || *s == '\\') ssid[k++] = '\\';
+            ssid[k++] = (unsigned char)*s < 0x20 ? '?' : *s;
+        }
+        ssid[k] = '\0';
+        printf("%s{\"ssid\":\"%s\",\"rssi\":%d}", i ? "," : "", ssid, e[i].rssi);
+    }
+    printf("]");
+}
+
+static void console_scan_task(void *arg) {
+    (void)arg;
+    wifi_scan_entry_t *e = calloc(CONSOLE_SCAN_MAX, sizeof(*e));
+    if (e) {
+        printf("@scan {");
+        int n = wifi_mgr_scan_passive(e, CONSOLE_SCAN_MAX, 0);
+        print_scan("passive", e, n);
+        n = wifi_mgr_scan(e, CONSOLE_SCAN_MAX, 0, NULL);
+        printf(",");
+        print_scan("active", e, n);
+        printf("}\n");
+        free(e);
+    } else {
+        printf("@scan {\"error\":\"out of memory\"}\n");
+    }
+    fflush(stdout);
+    vTaskDelete(NULL);
+}
+
+void muse_console_scan(void) {
+    if (xTaskCreate(console_scan_task, "console_scan", 4096, NULL, 4, NULL) != pdPASS) {
+        printf("@scan {\"error\":\"failed to start the scan task\"}\n");
+        fflush(stdout);
+    }
+}
+
+void muse_console_wifi(void) {
+    char json[768];
+    wifi_mgr_drops_json(json, sizeof(json));
+    printf("@wifi %s\n", json);
+    fflush(stdout);
+}
+
+void muse_console_image(const char *url) {
+    const char *code, *message;
+    if (!image_fetch_start(url, IMAGE_FETCH_DEFAULT_ROW, console_image_done, NULL, &code, &message)) {
+        printf("@img {\"ok\":false,\"code\":\"%s\",\"message\":\"%s\"}\n", code, message);
+        fflush(stdout);
+    }
 }
 #endif
 

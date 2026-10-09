@@ -16,6 +16,7 @@
 
 #include "wifi_mgr.h"
 
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdatomic.h>
@@ -24,6 +25,7 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "soc/soc_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -57,6 +59,21 @@ static atomic_bool s_connect_pending = ATOMIC_VAR_INIT(false);
 static atomic_bool s_sta_idle = ATOMIC_VAR_INIT(true);
 static int s_retry = 0;
 static int s_reconnect_backoff_ms = 1000;  // grows on consecutive failures
+
+// The last few drops from a working connection, for ">wifi" on the Muse
+// console: when, why, the signal, and how long the way back took.
+#define DROP_LOG 8
+typedef struct {
+    uint32_t t_s;        // uptime at the drop
+    uint8_t reason;      // wifi_err_reason_t
+    int8_t rssi;
+    int32_t back_ms;     // to the next IP, -1 while still down
+} drop_t;
+static drop_t s_drops[DROP_LOG];
+static unsigned s_drop_count;        // drops ever; s_drops holds the last DROP_LOG
+static unsigned s_failed_joins;      // disconnects while not yet connected
+static int64_t s_drop_us;            // the latest drop, 0 once reconnected
+static portMUX_TYPE s_drop_lock = portMUX_INITIALIZER_UNLOCKED;
 #define MAX_INITIAL_RETRY        3
 #define RECONNECT_BACKOFF_MIN_MS 1000
 #define RECONNECT_BACKOFF_MAX_MS 60000
@@ -158,6 +175,21 @@ static void event_handler(void *arg, esp_event_base_t base,
         ESP_LOGW(TAG, "station disconnected reason=%u rssi=%d",
                  ev ? ev->reason : 0, ev ? ev->rssi : 0);
 
+        int64_t now = esp_timer_get_time();
+        bool was_up = xEventGroupGetBits(s_events) & BIT_GOT_IP;
+        portENTER_CRITICAL(&s_drop_lock);
+        if (was_up) {
+            s_drops[s_drop_count % DROP_LOG] = (drop_t){
+                .t_s = (uint32_t)(now / 1000000), .reason = ev ? ev->reason : 0,
+                .rssi = ev ? ev->rssi : 0, .back_ms = -1,
+            };
+            s_drop_count++;
+            s_drop_us = now;
+        } else {
+            s_failed_joins++;
+        }
+        portEXIT_CRITICAL(&s_drop_lock);
+
         xEventGroupClearBits(s_events, BIT_CONNECTED | BIT_GOT_IP);
         atomic_store(&s_sta_idle, true);
         const wifi_event_sta_disconnected_t *event =
@@ -190,6 +222,13 @@ static void event_handler(void *arg, esp_event_base_t base,
         s_retry = 0;
         s_keep_connected = true;
         s_reconnect_backoff_ms = RECONNECT_BACKOFF_MIN_MS;  // reset on success
+        portENTER_CRITICAL(&s_drop_lock);
+        if (s_drop_us && s_drop_count) {
+            s_drops[(s_drop_count - 1) % DROP_LOG].back_ms =
+                (int32_t)((esp_timer_get_time() - s_drop_us) / 1000);
+            s_drop_us = 0;
+        }
+        portEXIT_CRITICAL(&s_drop_lock);
         xEventGroupSetBits(s_events, BIT_CONNECTED | BIT_GOT_IP);
     }
 }
@@ -428,8 +467,10 @@ esp_netif_t *wifi_mgr_get_netif(void) {
     return s_sta_netif;
 }
 
-int wifi_mgr_scan(wifi_scan_entry_t *out, int max_entries, uint8_t channel,
-                  const char *target_ssid) {
+// Active scans probe and wait for answers; passive ones only listen for
+// beacons, so they also hear an access point that ignores this station's probes.
+static int scan(wifi_scan_entry_t *out, int max_entries, uint8_t channel,
+                const char *target_ssid, bool passive) {
     if (!s_inited || !out || max_entries <= 0) return 0;
 
     // The driver refuses to scan while a join is winding down
@@ -453,10 +494,11 @@ int wifi_mgr_scan(wifi_scan_entry_t *out, int max_entries, uint8_t channel,
     wifi_scan_config_t sc = {
         .ssid = (uint8_t *)target_ssid,
         .channel = channel,
-        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+        .scan_type = passive ? WIFI_SCAN_TYPE_PASSIVE : WIFI_SCAN_TYPE_ACTIVE,
         .scan_time.active = { .min = 0, .max = 0 },
+        .scan_time.passive = passive ? 360 : 0,   // about three beacons at the usual 102 ms
     };
-    const char *which = target_ssid ? ", one network" : "";
+    const char *which = target_ssid ? ", one network" : passive ? ", passive" : "";
     if (channel) {
         ESP_LOGI(TAG, "starting wifi scan (ch=%u%s)...", channel, which);
     } else {
@@ -552,6 +594,15 @@ int wifi_mgr_scan(wifi_scan_entry_t *out, int max_entries, uint8_t channel,
     return n;
 }
 
+int wifi_mgr_scan(wifi_scan_entry_t *out, int max_entries, uint8_t channel,
+                  const char *target_ssid) {
+    return scan(out, max_entries, channel, target_ssid, false);
+}
+
+int wifi_mgr_scan_passive(wifi_scan_entry_t *out, int max_entries, uint8_t channel) {
+    return scan(out, max_entries, channel, NULL, true);
+}
+
 int wifi_mgr_scan_and_cache(void) {
     wifi_scan_entry_t fresh[MAX_CACHED_SCANS];
     int n = wifi_mgr_scan(fresh, MAX_CACHED_SCANS, 0, NULL);
@@ -617,4 +668,31 @@ int wifi_mgr_scan_and_merge_cache(void) {
     xSemaphoreGive(s_cache_mutex);
     ESP_LOGI(TAG, "merged scan: %d fresh, %d cached total", n, total);
     return total;
+}
+
+int wifi_mgr_drops_json(char *out, size_t cap) {
+    drop_t drops[DROP_LOG];
+    unsigned count, failed;
+    portENTER_CRITICAL(&s_drop_lock);
+    memcpy(drops, s_drops, sizeof(drops));
+    count = s_drop_count;
+    failed = s_failed_joins;
+    portEXIT_CRITICAL(&s_drop_lock);
+
+    wifi_ap_record_t ap;
+    bool up = wifi_mgr_is_connected() && esp_wifi_sta_get_ap_info(&ap) == ESP_OK;
+    int n = snprintf(out, cap, "{\"uptime_s\":%lu,\"connected\":%s,\"rssi\":%d,\"channel\":%d,"
+                     "\"drops\":%u,\"failed_joins\":%u,\"recent\":[",
+                     (unsigned long)(esp_timer_get_time() / 1000000), up ? "true" : "false",
+                     up ? ap.rssi : 0, up ? ap.primary : 0, count, failed);
+    unsigned first = count > DROP_LOG ? count - DROP_LOG : 0;
+    for (unsigned i = first; i < count && n > 0 && (size_t)n < cap; i++) {
+        const drop_t *d = &drops[i % DROP_LOG];
+        n += snprintf(out + n, cap - n, "%s{\"t_s\":%lu,\"reason\":%u,\"rssi\":%d,\"back_ms\":%ld}",
+                      i == first ? "" : ",", (unsigned long)d->t_s, d->reason, d->rssi, (long)d->back_ms);
+    }
+    if (n > 0 && (size_t)n < cap) {
+        n += snprintf(out + n, cap - n, "]}");
+    }
+    return n;
 }

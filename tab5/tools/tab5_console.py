@@ -73,7 +73,15 @@ def main():
     pending = ""
     while time.time() < end:
         try:
-            with serial.Serial(a.port, 115200, timeout=0.2) as s:
+            # pyserial asserts DTR and RTS on open by default, and the P4's
+            # USB Serial/JTAG takes changes on those lines as a reset: set both
+            # off before opening, so watching the console never restarts it.
+            s = serial.Serial(baudrate=115200, timeout=0.2)
+            s.port = a.port
+            s.dtr = False
+            s.rts = False
+            s.open()
+            with s:
                 while time.time() < end:
                     if not sent and time.time() - start >= a.after:
                         for line in a.send:

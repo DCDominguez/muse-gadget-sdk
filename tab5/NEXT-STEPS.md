@@ -1,4 +1,32 @@
-# Tab5 next steps — 2026-10-07
+# Tab5 next steps — 2026-10-10
+
+## Update: pixel UI redesign (test28 on hardware)
+
+The Tab5 now runs the approved "Cosmo" pixel UI (CONFIG_MUSE_PIXEL_THEME, default
+on for the Tab5). Verified on hardware with screenshots (tools/muse/snap.py):
+
+- Dock: status strip, name and mood, hold-to-talk, scrolling chat, pocket of
+  quick controls, full screen; Pixelify Sans 19/30 and Silkscreen 16 fonts
+  (tools/muse/gen_pixel_fonts.sh, which also redraws Pixelify's 19 px "B").
+- Scenery (muse_scene.c) behind a see-through Cosmo; Cosmo turns, walks and
+  idles about his island (muse_pose_t.facing/.walk, the dock's wander controller).
+- Work props in Cosmo's own pixel style (muse_props.c): book, globe, typewriter,
+  easel, camera. Pictures from Muse get a pixel polaroid frame.
+- Settings open in a pixel window where the pocket and chat go (right side),
+  not a tile over Cosmo; every page restyled (muse_pixel_style.h shared look).
+  Docked, the face's own caption, reply and meter overlays are off: the chat shows them.
+- Tab5 LVGL task stack raised to 16 KB (the settings Wi-Fi page overflowed 7 KB).
+- Sign-in: one refresh rejection no longer unpairs (4 rejections over 30 min do).
+- Camera on/off in the pocket, "snap!" notice, upright photos; Wi-Fi drop log,
+  console `>cam`, `>wifi`, `>scan`, `>dock=...` (pocket, full, demo, osk, walk,
+  turn, think, work=KIND, settings[=PAGE]) for testing without touching the screen.
+
+Next: capture Muse's real activity codes (work_kind() matches keywords for now);
+owner's open choices: 2x scaling for small pictures, bigger Cosmo in full screen,
+a clock (needs SNTP and a timezone). Settings' MAC address row is empty on the P4
+(no local Wi-Fi MAC; pre-existing).
+
+## Earlier: 2026-10-07
 
 ## Current verified state
 

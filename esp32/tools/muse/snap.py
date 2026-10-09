@@ -20,7 +20,7 @@ sent 350 ms apart. A '>' starts a console command that runs to the end of the ke
 sent as one line: '>face=thinking' puts the avatar in a mode, '>face=happy' pets it.
 Screenshots are off by default; build and flash with MUSE_BENCH=1 tools/muse/board.sh.
 With reset_wait_s the board is reset first and given that long to boot.
-The PNG is scaled 3x so small screens are readable.
+The PNG is scaled 3x for small screens so they're readable (1x from 400x400 up).
 """
 import base64
 import re
@@ -31,9 +31,14 @@ import zlib
 
 import serial
 
-SCALE = 3
 port, keys, out = sys.argv[1], sys.argv[2], sys.argv[3]
-s = serial.Serial(port, 115200, timeout=0.2)
+# DTR and RTS off before opening: on a chip's own USB Serial/JTAG (the Tab5)
+# pyserial's defaults would reset the board just by opening the port.
+s = serial.Serial(baudrate=115200, timeout=0.2)
+s.port = port
+s.dtr = False
+s.rts = False
+s.open()
 
 
 def rd(t, *until):
@@ -54,13 +59,14 @@ for k in keys:
 if command:
     s.write(f'>{line}\n'.encode()); time.sleep(0.35)
 s.write(b'p')
-log = rd(20, b'SNAP END', b'SNAP OFF').decode('latin1')   # 20 s: a UART console at 115200 takes ~8 s for 135x240
+log = rd(90, b'SNAP END', b'SNAP OFF').decode('latin1')   # a UART console at 115200 takes ~8 s for 135x240; 1280x720 is ~2.5 MB
 if 'SNAP BEGIN' not in log:
     sys.exit('screenshots are off in this build: MUSE_BENCH=1 tools/muse/board.sh build|flash <board>'
              if 'SNAP OFF' in log else 'no screenshot: the board never answered')
 head, body = log[log.index('SNAP BEGIN'):].split('\n', 1)
 f = head.split()
 w, h = int(f[2]), int(f[3])
+SCALE = 3 if w * h < 400 * 400 else 1   # small screens scaled up to be readable
 per_line = int(f[4]) if len(f) > 4 else 144   # bytes per base64 line; older firmware doesn't say
 # The log shares the port and can come between the base64 lines, a character at
 # a time on a UART console, so each base64 line is the tail of the line it's on.

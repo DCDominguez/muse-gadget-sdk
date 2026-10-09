@@ -45,6 +45,11 @@ typedef struct {
     float waking;    /* the screen came on: quick blinks, a stretch, alert (MUSE_WAKING_S) */
     float tickle;    /* tickled on the screen: startle, then squirm and giggle while it lasts, then
                       * catch his breath (MUSE_TICKLE_S; held below MUSE_TICKLE_HOLD while it continues) */
+    /* Which way Muse faces, in radians: 0 towards you (as always before),
+     * +pi/2 to the screen's right, pi away, -pi/2 to the left. An avatar that
+     * ignores it always faces you. */
+    float facing;
+    float walk;      /* 0 standing, 1 walking: the feet step */
 } muse_pose_t;
 
 #define MUSE_DIZZY_S 4.0f
@@ -68,3 +73,11 @@ void muse_pixel_set_size(int px);
  * image never has to exist in RAM.
  */
 void muse_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1);
+
+/*
+ * The same pixels' opacity, one byte each, stride_px apart: 0 where only the
+ * background shows, 255 where Muse (or the glow and sparkles around Muse) is.
+ * Lets a screen with its own scenery show it around Muse. An avatar without
+ * it is drawn opaque (muse_ui has a fallback).
+ */
+void muse_pixel_scale_alpha(uint8_t *dst, int stride_px, int x0, int x1, int y0, int y1);

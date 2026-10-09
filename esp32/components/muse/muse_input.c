@@ -15,6 +15,7 @@
  */
 
 #include "muse_input.h"
+#include "muse_dock.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -673,6 +674,31 @@ __attribute__((weak)) void muse_console_dump_log(void)
     fflush(stdout);
 }
 
+__attribute__((weak)) void muse_console_image(const char *url)
+{
+    (void)url;
+    printf("@img.error unsupported\n");
+    fflush(stdout);
+}
+
+__attribute__((weak)) void muse_console_camera(void)
+{
+    printf("@cam.error unsupported\n");
+    fflush(stdout);
+}
+
+__attribute__((weak)) void muse_console_wifi(void)
+{
+    printf("@wifi.error unsupported\n");
+    fflush(stdout);
+}
+
+__attribute__((weak)) void muse_console_scan(void)
+{
+    printf("@scan.error unsupported\n");
+    fflush(stdout);
+}
+
 /*
  * "tts" shows the speech server, "tts=URL" sets it ("tts=" clears it) and
  * "tts.voice=NAME" its voice ("tts.voice=" the default). A server with no
@@ -745,6 +771,29 @@ static bool console_command(char *line, bool whole)
         set_face(line + 5);
         return true;
     }
+    if (!strncmp(line, "img=", 4)) {
+        muse_console_image(line + 4);
+        return true;
+    }
+    if (!strcmp(line, "cam")) {
+        muse_console_camera();
+        return true;
+    }
+    if (!strcmp(line, "wifi")) {
+        muse_console_wifi();
+        return true;
+    }
+    if (!strcmp(line, "scan")) {
+        muse_console_scan();
+        return true;
+    }
+    if (!strncmp(line, "dock=", 5)) {
+        if (muse_board->display_lock && muse_board->display_lock(1000)) {
+            muse_dock_command(line + 5);
+            muse_board->display_unlock();
+        }
+        return true;
+    }
     if (!strcmp(line, "imu")) {
         float a[3], g[3];
         bool ok = muse_imu_last(a, g);
@@ -789,7 +838,10 @@ static bool console_command(char *line, bool whole)
  * the device's state, "log" the log since boot, "power" the battery meter (muse_battery.h) and
  * "power.reset" starts it over, "nap" sleeps and leaves Wi-Fi at once (as
  * two minutes asleep on battery would; 'w' rejoins), "face=" shows a face
- * (see set_face), "tts=" sets a speech server (see tts_command), and
+ * (see set_face), "img=URL" draws an image as display.draw_url would,
+ * "cam" takes a photo as camera.capture would, "wifi" lists recent drops,
+ * "dock=pocket|full|demo|osk" shows the dock's states,
+ * "tts=" sets a speech server (see tts_command), and
  * "chat=" sends a typed message to Hatch (see chat_line and
  * tools/muse/chat.py).
  */

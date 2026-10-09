@@ -26,6 +26,8 @@
 #include "tab5_camera.h"
 
 #include <errno.h>
+#include <stdatomic.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,7 +43,9 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_video_device.h"
+#include "muse_ui.h"
 #include "linux/videodev2.h"
+#include "nvs.h"
 
 static const char *TAG = "tab5.camera";
 
@@ -55,9 +59,82 @@ static const char *TAG = "tab5.camera";
 static int (*s_rotation)(void);
 static jpeg_encoder_handle_t s_jpeg;
 static ppa_client_handle_t s_ppa;
+static bool s_enabled;   /* the owner's switch, from NVS at registration */
+/* When the on-screen notice may go: INT64_MAX while a capture runs. Set from
+ * the capture task, read from the LVGL task; a 64-bit atomic keeps it whole. */
+static _Atomic int64_t s_in_use_until;
+#define IN_USE_AFTER_US (2 * 1000 * 1000)
+
+bool tab5_camera_enabled(void)
+{
+    return s_enabled;
+}
+
+bool tab5_camera_in_use(void)
+{
+    return esp_timer_get_time() < s_in_use_until;
+}
+
+/* From muse_dock's button, in the LVGL task; the same NVS namespace as Flip. */
+void tab5_camera_set_enabled(bool on)
+{
+    s_enabled = on;
+    nvs_handle_t h;
+    if (nvs_open("muse_tab5", NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_u8(h, "camera", on);
+        nvs_commit(h);
+        nvs_close(h);
+    }
+    ESP_LOGI(TAG, "camera turned %s", on ? "on" : "off");
+}
+
+/* After a photo: it shows over Muse for PHOTO_SHOWN_US, so the owner sees
+ * what Muse was sent; a tap or talk press hides it sooner (muse_ui). */
+#define PHOTO_SHOWN_US (5 * 1000 * 1000)
+static esp_timer_handle_t s_hide_timer;
+
+static void hide_photo(void *arg)
+{
+    (void)arg;
+    muse_ui_image_hide();
+}
+
+/* pixels: native RGB565 from the PPA; muse_ui takes it high byte first. */
+static void show_photo(const uint16_t *pixels, int w, int h)
+{
+    int uw, uh;
+    if (!muse_ui_image_size(&uw, &uh) || w > uw || h > uh) {
+        return;
+    }
+    uint8_t *row = malloc((size_t)w * 2);
+    if (!row) {
+        return;
+    }
+    int x = (uw - w) / 2, y = (uh - h) / 2;
+    for (int r = 0; r < h; r++) {
+        const uint16_t *src = pixels + (size_t)r * w;
+        for (int i = 0; i < w; i++) {
+            row[2 * i] = src[i] >> 8;
+            row[2 * i + 1] = src[i] & 0xff;
+        }
+        muse_ui_image_draw(x, y + r, w, 1, (const uint16_t *)row);
+    }
+    free(row);
+    if (!s_hide_timer) {
+        const esp_timer_create_args_t args = { .callback = hide_photo, .name = "photo_hide" };
+        esp_timer_create(&args, &s_hide_timer);
+    }
+    if (s_hide_timer) {
+        esp_timer_stop(s_hide_timer);
+        esp_timer_start_once(s_hide_timer, PHOTO_SHOWN_US);
+    }
+}
 
 static esp_err_t cam_init(void)
 {
+    if (!s_enabled) {
+        return ESP_ERR_NOT_ALLOWED;   /* not even powered */
+    }
     esp_err_t err = bsp_camera_start(NULL);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "camera didn't start: %s", esp_err_to_name(err));
@@ -91,6 +168,10 @@ static esp_err_t grab(uint8_t **rgb, int *w, int *h)
     if (ioctl(fd, VIDIOC_G_FMT, &fmt) != 0) {
         goto out;
     }
+    /* esp_video 2.0.1's G_FMT copies back a stored format whose type is never
+     * set before the first S_FMT, so S_FMT would find no stream and fail
+     * (EINVAL, unlogged). Put the type back. */
+    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB565;
     if (ioctl(fd, VIDIOC_S_FMT, &fmt) != 0) {
         ESP_LOGW(TAG, "RGB565 not accepted");
@@ -156,8 +237,11 @@ out:
     return err;
 }
 
-static esp_err_t cam_capture(camera_frame_t *out)
+static esp_err_t capture_frame(camera_frame_t *out)
 {
+    if (!s_enabled) {
+        return ESP_ERR_NOT_ALLOWED;   /* turned off after an earlier capture */
+    }
     int64_t t0 = esp_timer_get_time();
     uint8_t *rgb = NULL;
     int w = 0, h = 0;
@@ -176,20 +260,29 @@ static esp_err_t cam_capture(camera_frame_t *out)
     }
     size_t small_len = (size_t)ow * oh * 2;
     size_t small_cap = (small_len + ALIGN - 1) / ALIGN * ALIGN;
-    const jpeg_encode_memory_alloc_cfg_t in_cfg = { .buffer_direction = JPEG_ENC_ALLOC_INPUT_BUFFER };
     const jpeg_encode_memory_alloc_cfg_t out_cfg = { .buffer_direction = JPEG_ENC_ALLOC_OUTPUT_BUFFER };
-    size_t got = 0, jcap = 0;
-    uint8_t *small = jpeg_alloc_encoder_mem(small_cap, &in_cfg, &got);
+    size_t jcap = 0;
+    /* The PPA writes it, so it needs cache-line alignment in address and size;
+     * jpeg_alloc_encoder_mem() aligns only the encoder's output buffers. */
+    uint8_t *small = heap_caps_aligned_calloc(ALIGN, 1, small_cap, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA);
     uint8_t *jpeg = jpeg_alloc_encoder_mem(small_len / 2, &out_cfg, &jcap);
-    err = small && jpeg && got >= small_cap ? ESP_OK : ESP_ERR_NO_MEM;
+    err = small && jpeg ? ESP_OK : ESP_ERR_NO_MEM;
     if (err == ESP_OK) {
+        /* The PPA scales the whole input block, which must then fit the output:
+         * rounding the output to JPEG blocks (720 rows -> 352, not 360) would
+         * overflow it, so take the centre of the frame that scales to exactly
+         * ow x oh (before turning, the sides swap). */
+        int bw = (int)((sideways ? oh : ow) / scale), bh = (int)((sideways ? ow : oh) / scale);
+        bw = bw > w ? w : bw;
+        bh = bh > h ? h : bh;
         const ppa_srm_oper_config_t srm = {
             .in = {
-                .buffer = rgb, .pic_w = w, .pic_h = h, .block_w = w, .block_h = h,
+                .buffer = rgb, .pic_w = w, .pic_h = h, .block_w = bw, .block_h = bh,
+                .block_offset_x = (w - bw) / 2, .block_offset_y = (h - bh) / 2,
                 .srm_cm = PPA_SRM_COLOR_MODE_RGB565,
             },
             .out = {
-                .buffer = small, .buffer_size = got, .pic_w = ow, .pic_h = oh,
+                .buffer = small, .buffer_size = small_cap, .pic_w = ow, .pic_h = oh,
                 .srm_cm = PPA_SRM_COLOR_MODE_RGB565,
             },
             .rotation_angle = rot == 90    ? PPA_SRM_ROTATION_ANGLE_90
@@ -213,7 +306,10 @@ static esp_err_t cam_capture(camera_frame_t *out)
         };
         err = jpeg_encoder_process(s_jpeg, &enc, small, small_len, jpeg, jcap, &jlen);
     }
-    free(small);
+    if (err == ESP_OK) {
+        show_photo((const uint16_t *)small, ow, oh);
+    }
+    heap_caps_free(small);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "scale or encode failed: %s", esp_err_to_name(err));
         free(jpeg);
@@ -223,6 +319,19 @@ static esp_err_t cam_capture(camera_frame_t *out)
              (int)((esp_timer_get_time() - t0) / 1000));
     *out = (camera_frame_t){ .jpeg = jpeg, .len = jlen, .width = ow, .height = oh, .priv = jpeg };
     return ESP_OK;
+}
+
+/* The on-screen notice is up while the camera streams, and for a moment after. */
+static esp_err_t cam_capture(camera_frame_t *out)
+{
+    if (!s_enabled) {
+        return ESP_ERR_NOT_ALLOWED;
+    }
+    s_in_use_until = INT64_MAX;
+    ESP_LOGI(TAG, "taking a photo");
+    esp_err_t err = capture_frame(out);
+    s_in_use_until = esp_timer_get_time() + IN_USE_AFTER_US;
+    return err;
 }
 
 static void cam_release(camera_frame_t *frame)
@@ -241,6 +350,14 @@ static const camera_driver_t s_driver = {
 
 void tab5_camera_register(int (*rotation)(void))
 {
+    nvs_handle_t h;
+    uint8_t on = 0;
+    if (nvs_open("muse_tab5", NVS_READONLY, &h) == ESP_OK) {
+        nvs_get_u8(h, "camera", &on);
+        nvs_close(h);
+    }
+    s_enabled = on != 0;
+    ESP_LOGI(TAG, "camera %s (dock button)", s_enabled ? "on" : "off");
     s_rotation = rotation;
     camera_register(&s_driver);
 }

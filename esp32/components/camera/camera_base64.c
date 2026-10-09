@@ -26,6 +26,7 @@ char *camera_capture_base64(const char **error)
     esp_err_t err = camera_capture(&frame);
     if (err != ESP_OK) {
         *error = err == ESP_ERR_NOT_SUPPORTED   ? "no camera"
+                 : err == ESP_ERR_NOT_ALLOWED   ? "the camera is turned off on the device; its owner can turn it on with the Camera button"
                  : err == ESP_ERR_INVALID_STATE ? "camera busy"
                  : err == ESP_ERR_TIMEOUT       ? "the camera didn't deliver a frame"
                  : err == ESP_ERR_NO_MEM        ? "camera memory allocation failed"

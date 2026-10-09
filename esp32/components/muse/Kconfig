@@ -205,10 +205,11 @@ menu "Muse"
     config MUSE_TAB5_CAMERA_ROTATION
         int "M5Stack Tab5: camera rotation, degrees counter-clockwise"
         depends on MUSE_TAB5_CAMERA
-        default 180
+        default 0
         help
             Turns each frame upright for the Tab5 held landscape (0, 90, 180
-            or 270); Flip adds 180.
+            or 270); Flip adds 180. 0 is upright on a Tab5 v1.3 with the
+            keyboard below the screen (checked on hardware).
 
     config MUSE_CAMERA_CAPTURE
         bool
@@ -226,6 +227,32 @@ menu "Muse"
             one 16 px line at a time. Takes about 850 KB of flash and no RAM.
             Without it those characters show as boxes. Hangul isn't
             included.
+
+    config MUSE_PIXEL_THEME
+        bool "Pixel look for the dock around Muse"
+        depends on MUSE_ENABLED
+        default y if MUSE_BOARD_M5STACK_TAB5
+        default n
+        help
+            Large screens with a dock (the Tab5) draw it in Muse's own
+            pixel-art style: night-sky colours, notched pixel borders and
+            pixel fonts (Pixelify Sans for chat and titles, Silkscreen for
+            labels, both under the SIL Open Font License). Takes about
+            120 KB of flash. Without it the dock uses LVGL's Montserrat.
+
+    config MUSE_EMOJI_FONT
+        bool "Show emoji in the dock's chat"
+        depends on MUSE_ENABLED
+        default y if MUSE_BOARD_M5STACK_TAB5
+        default n
+        help
+            The chat beside Muse on large screens (the Tab5's dock) falls
+            back to Google's monochrome Noto Emoji at 16 px for the
+            emoticons block and about 125 other common emoji, and offers a
+            picker of them next to Send. Single-codepoint emoji only:
+            variation selectors and skin tones are dropped, and a ZWJ
+            sequence shows as its parts. Takes about 30 KB of flash and no
+            RAM. Without it emoji show as boxes.
 
     config MUSE_JC3248W535_MIC_GPIO
         int "JC3248W535: GPIO for an external I2S mic's data (SD) line"

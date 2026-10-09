@@ -230,9 +230,21 @@ bool muse_text_has_cjk(const char *s)
 
 void muse_text_to_ascii(char *s, size_t cap)
 {
+    muse_text_to_ascii_keeping(s, cap, NULL);
+}
+
+void muse_text_to_ascii_keeping(char *s, size_t cap, bool (*keep)(uint32_t cp))
+{
     size_t n = strlen(s);
     for (char *p = s; *p;) {
         size_t len;
+        if (keep) {
+            int32_t cp = decode((const unsigned char *)p, &len);
+            if (cp >= 0x80 && keep((uint32_t)cp)) {
+                p += len;
+                continue;
+            }
+        }
         char a[4];
         int alen = muse_text_ascii(p, &len, a);
         if (alen < 0) {
@@ -248,6 +260,20 @@ void muse_text_to_ascii(char *s, size_t cap)
         n = n - len + alen;
         p += alen;
     }
+}
+
+size_t muse_text_overlap(const char *text, const char *next, size_t min)
+{
+    size_t a = strlen(text), n = strlen(next);
+    for (size_t k = a < n ? a : n; k > 0; k--) {
+        /* Shorter than min, only whole words: a caption that slid by most of
+         * its length still repeats its last word ("a band:" then "band: ..."). */
+        bool words = (k == a || text[a - k - 1] == ' ') && (k == n || next[k] == ' ');
+        if ((k >= min || words) && !memcmp(text + a - k, next, k)) {
+            return k;
+        }
+    }
+    return 0;
 }
 
 const char *muse_text_showable(const char *text, char *buf, size_t cap)

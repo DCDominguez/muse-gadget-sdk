@@ -24,8 +24,9 @@
  * LCD, touch, speaker, USB and the ESP32-C6 that carries Wi-Fi and BLE over
  * SDIO (esp_hosted).
  *
- * Muse takes an 800x480 box in the top left and muse_dock fills the rest:
- * status and a typed chat to the right, hold-to-talk and quick controls below.
+ * Muse takes the top 720x600 of a stage on the left and muse_dock fills the rest: a
+ * typed chat to the right, and over the stage a status strip, hold-to-talk
+ * and the pocket of quick controls (full screen centres the stage alone).
  * There is no user button: the touchscreen talks and runs the menus, and the
  * Tab5 Keyboard (M5Stack A164, on Ext.Port1) types into the chat, with Tab
  * held to talk.
@@ -64,8 +65,8 @@
 /* Same source: io1.gpio6 == CHG_STAT, high while charging. */
 #define TAB5_CHG_STAT_PIN  IO_EXPANDER_PIN_NUM_6
 
-#define UI_W 800
-#define UI_H 480
+#define UI_W 720
+#define UI_H 600   /* the dock's buttons take the bottom 120 px */
 
 /* INA226 (TI datasheet): config 0x00, shunt voltage 0x01 (2.5 uV/bit,
  * signed), bus voltage 0x02 (1.25 mV/bit). Config: 16-sample averaging,
@@ -261,6 +262,12 @@ static esp_err_t init(void)
     keyboard_bus_init();
     imu_init();
 #if CONFIG_MUSE_TAB5_CAMERA
+    /* The IO expander keeps CAMERA_EN through a reset (a flash, say), so a
+     * camera started before it would stay powered; seen with Wi-Fi then not
+     * finding the network until a power cycle. Off until the next photo, whose
+     * bsp_camera_start() turns it back on. */
+    esp_err_t cam_off = bsp_feature_enable(BSP_FEATURE_CAMERA, false);
+    ESP_LOGI(TAG, "camera power off at boot: %s", esp_err_to_name(cam_off));
     tab5_camera_register(camera_rotation);
 #endif
     return ESP_OK;
@@ -314,6 +321,9 @@ static lv_display_t *display_start(lv_indev_t **touch)
     };
     cfg.lvgl_port_cfg.task_affinity = MUSE_UI_CORE;
     cfg.lvgl_port_cfg.task_priority = MUSE_UI_PRIORITY;
+    /* The dock's settings window nests deeper than the port's 7 KB default
+     * draws: window, page, list, card, pixel icon (the Wi-Fi page overflowed). */
+    cfg.lvgl_port_cfg.task_stack = 16 * 1024;
     lv_display_t *disp = bsp_display_start_with_config(&cfg);
     if (!disp) {
         return NULL;
@@ -592,7 +602,7 @@ static const muse_board_t s_board = {
     .height = UI_H,
     .ui_x = 0,
     .ui_y = 0,
-    .avatar_px = 288,
+    .avatar_px = 384,   /* 6 screen px a pixel */
     .round = false,
     .touch = true,
     .diagonal_in = 5.0f,
@@ -612,6 +622,11 @@ static const muse_board_t s_board = {
     .power_off = power_off,
     .flip_display = flip_display,
     .keyboard_present = keyboard_present,
+#if CONFIG_MUSE_TAB5_CAMERA
+    .camera_enabled = tab5_camera_enabled,
+    .set_camera_enabled = tab5_camera_set_enabled,
+    .camera_in_use = tab5_camera_in_use,
+#endif
 };
 
 const muse_board_t *muse_board_get(void)

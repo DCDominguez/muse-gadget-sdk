@@ -226,7 +226,14 @@ def capture(port, secs, out_path):
     with open(out_path, "w", encoding="utf-8", errors="replace") as log:
         while time.time() < end:
             try:
-                with serial.Serial(port, 115200, timeout=0.5) as s:
+                # DTR and RTS off before opening: the P4's USB Serial/JTAG
+                # resets on changes to them (tab5_console.py does the same).
+                s = serial.Serial(baudrate=115200, timeout=0.5)
+                s.port = port
+                s.dtr = False
+                s.rts = False
+                s.open()
+                with s:
                     while time.time() < end:
                         if not asked and time.time() - start > 20:
                             s.write(b">log\n")     # the log since power-on

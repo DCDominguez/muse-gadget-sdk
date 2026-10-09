@@ -59,11 +59,14 @@ python tab5_flash.py --port COM4 --token-file $env:USERPROFILE\tab5-secrets\tab5
 python tab5_console.py --port COM4 --send ">status" --secs 3
 python tab5_console.py --port COM4 --send ">log" --secs 6 --out log.txt
 python tab5_console.py --port COM4 --send ">imu" --secs 2
+python tab5_console.py --port COM4 --send ">cam" --secs 15 --until "@cam"
+python tab5_console.py --port COM4 --send ">wifi" --secs 3
+python tab5_console.py --port COM4 --send ">img=http://HOST/pic.jpg" --secs 20 --until "@img"
 python tab5_console.py --port COM4 --secs 30 --until "shaken"
 python tab5_console.py --port COM4 --reset --secs 40 --out boot.log
 ```
 
-Console lines: `status`, `log`, `power`, `imu`, `tts`, `tts=URL`,
+Console lines: `status`, `log`, `power`, `imu`, `img=URL`, `cam`, `wifi`, `scan`, `tts`, `tts=URL`,
 `face=NAME`, `chat=TEXT` (types to Muse), `nap`. Keys (`--key`): `d`/`u`
 talk button down/up, `m` test MP3, `z`/`w` sleep/wake.
 
