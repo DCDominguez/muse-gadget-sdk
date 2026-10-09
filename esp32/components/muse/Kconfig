@@ -240,6 +240,16 @@ menu "Muse"
             labels, both under the SIL Open Font License). Takes about
             120 KB of flash. Without it the dock uses LVGL's Montserrat.
 
+    config MUSE_CLOCK_TZ
+        string "Time zone for the dock's clock (POSIX TZ)"
+        depends on MUSE_PIXEL_THEME
+        default "UTC0"
+        help
+            The dock's status strip shows the time once it's set over the
+            network (SNTP, from pool.ntp.org). A POSIX TZ string: "UTC0",
+            "PHT-8" for the Philippines (UTC+8), "PST8PDT,M3.2.0,M11.1.0"
+            for US Pacific. Empty hides the clock.
+
     config MUSE_EMOJI_FONT
         bool "Show emoji in the dock's chat"
         depends on MUSE_ENABLED

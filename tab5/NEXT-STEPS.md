@@ -21,10 +21,18 @@ on for the Tab5). Verified on hardware with screenshots (tools/muse/snap.py):
   console `>cam`, `>wifi`, `>scan`, `>dock=...` (pocket, full, demo, osk, walk,
   turn, think, work=KIND, settings[=PAGE]) for testing without touching the screen.
 
-Next: capture Muse's real activity codes (work_kind() matches keywords for now);
-owner's open choices: 2x scaling for small pictures, bigger Cosmo in full screen,
-a clock (needs SNTP and a timezone). Settings' MAC address row is empty on the P4
-(no local Wi-Fi MAC; pre-existing).
+Muse's activity, captured 2026-10-10 (agent.status payload): activity_code is only
+"working", "responding" or "online"; activity_text names the work: "Searching",
+"Researching", "Generating image" (after "making something"), "is working", "is
+responding", with an optional activity_emoji. task.status carries running,
+completed and user_denied (a permission the Muse app asked for and didn't get).
+The dock picks Cosmo's prop from activity_text (research before search).
+Clock: SNTP once Wi-Fi is up, CONFIG_MUSE_CLOCK_TZ (the owner's build: "PHT-8").
+
+Open choices: 2x scaling for small pictures, bigger Cosmo in full screen.
+Settings' MAC address row is empty on the P4 (no local Wi-Fi MAC; pre-existing).
+Muse's /chat/stream sometimes answers HTTP 502 after 120 s (server side, seen
+2026-10-10): the turn fails with "MUSE DIDN'T TAKE IT".
 
 ## Earlier: 2026-10-07
 

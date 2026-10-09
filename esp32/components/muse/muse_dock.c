@@ -29,9 +29,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_netif_sntp.h"
 #include "esp_random.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -94,7 +96,7 @@ static lv_obj_t *s_stage;           /* over Muse's area: status, name, talk, poc
 static lv_obj_t *s_chat;            /* the chat window */
 static lv_obj_t *s_pocket;          /* the quick controls, over the chat window */
 static lv_obj_t *s_setwin;          /* settings, over the chat window too */
-static lv_obj_t *s_dot, *s_link, *s_bars[4], *s_cells[3], *s_batt_pct, *s_kb_icon;
+static lv_obj_t *s_dot, *s_link, *s_bars[4], *s_cells[3], *s_batt_pct, *s_kb_icon, *s_clock;
 static lv_obj_t *s_mood;
 static lv_obj_t *s_log, *s_input, *s_osk, *s_talk, *s_talk_label;
 #if CONFIG_MUSE_EMOJI_FONT
@@ -1026,7 +1028,9 @@ static work_t work_kind(muse_mode_t mode)
     if (mode == MUSE_MODE_LISTENING || mode == MUSE_MODE_SPEAKING) {
         return WORK_NONE;
     }
-    static const char *const IMAGE[] = { "image", "draw", "paint", "picture", "illustrat", "render", NULL };
+    /* Muse's activity_text, as seen: "Searching", "Researching", "Generating
+     * image" (after "making something"), "is working", "is responding". */
+    static const char *const IMAGE[] = { "image", "draw", "paint", "picture", "illustrat", "render", "making", NULL };
     static const char *const SEARCH[] = { "search", "web", "brows", "google", "lookup", "look_up", NULL };
     static const char *const RESEARCH[] = { "research", "read", "fetch", "document", "analy", "study", NULL };
     static const char *const WRITE[] = { "writ", "compos", "draft", "typ", NULL };
@@ -1038,11 +1042,11 @@ static work_t work_kind(muse_mode_t mode)
         if (has_word(s_activity, CAMERA)) {
             return WORK_CAMERA;
         }
+        if (has_word(s_activity, RESEARCH)) {   /* before search: "reSEARCHing" */
+            return WORK_RESEARCH;
+        }
         if (has_word(s_activity, SEARCH)) {
             return WORK_SEARCH;
-        }
-        if (has_word(s_activity, RESEARCH)) {
-            return WORK_RESEARCH;
         }
         if (has_word(s_activity, WRITE)) {
             return WORK_WRITE;
@@ -1645,6 +1649,41 @@ static void show_mood(muse_mode_t mode)
     }
 }
 
+/* The time in the status strip, in CONFIG_MUSE_CLOCK_TZ, once SNTP has set it
+ * (which starts with the first Wi-Fi connection). Hidden until then. */
+static void show_clock(bool wifi)
+{
+#if CONFIG_MUSE_PIXEL_THEME
+    static bool started;
+    if (!s_clock || !CONFIG_MUSE_CLOCK_TZ[0]) {
+        return;
+    }
+    if (!started && wifi) {
+        setenv("TZ", CONFIG_MUSE_CLOCK_TZ, 1);
+        tzset();
+        esp_sntp_config_t cfg = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+        started = esp_netif_sntp_init(&cfg) == ESP_OK;
+    }
+    time_t now = time(NULL);
+    struct tm tm;
+    localtime_r(&now, &tm);
+    bool set = tm.tm_year + 1900 >= 2025;
+    if (set) {
+        int h = tm.tm_hour % 12;
+        char buf[12];
+        snprintf(buf, sizeof(buf), "%d:%02d %s", h ? h : 12, tm.tm_min, tm.tm_hour < 12 ? "am" : "pm");
+        if (strcmp(lv_label_get_text(s_clock), buf)) {
+            lv_label_set_text(s_clock, buf);
+        }
+    }
+    if (set == lv_obj_has_flag(s_clock, LV_OBJ_FLAG_HIDDEN)) {
+        lv_obj_set_flag(s_clock, LV_OBJ_FLAG_HIDDEN, !set);
+    }
+#else
+    (void)wifi;
+#endif
+}
+
 static void update_status(void)
 {
     muse_link_state_t link = muse_link_state();
@@ -1677,6 +1716,8 @@ static void update_status(void)
         }
         lv_label_set_text_fmt(s_batt_pct, "%d%%", p.battery_pct);
     }
+
+    show_clock(w.state == MUSE_WIFI_CONNECTED);
 
     bool kb = muse_board->keyboard_present && muse_board->keyboard_present();
     if (kb == lv_obj_has_flag(s_kb_icon, LV_OBJ_FLAG_HIDDEN)) {
@@ -1734,6 +1775,7 @@ static void refresh(lv_timer_t *t)
 static void build_status(lv_obj_t *parent)
 {
     lv_obj_t *hud = pixel_box(parent, 24, 20, 260, 48, C_PANEL, C_EDGE, C_PANEL, C_NIGHT);
+    lv_obj_set_width(hud, LV_SIZE_CONTENT);   /* grows with the clock */
     lv_obj_set_flex_flow(hud, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(hud, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_hor(hud, 12, 0);
@@ -1759,6 +1801,8 @@ static void build_status(lv_obj_t *parent)
         s_cells[i] = rect(batt, (2 + 4 * i) * 2, 2 * 2, 3 * 2, 5 * 2, C_METER_OFF);
     }
     s_batt_pct = label(hud, F_LABEL, C_TEXT);
+    s_clock = label(hud, F_LABEL, C_SUN);
+    lv_obj_add_flag(s_clock, LV_OBJ_FLAG_HIDDEN);
 
     s_kb_icon = icon_box(hud, 11, 9, 2);
     icon_cells(s_kb_icon, ICON({ 0, 1, 11, 7 }), 2, C_TEXT);

@@ -123,7 +123,7 @@ set(muse_priv_requires
     bt esp-tls mbedtls esp_app_format esp_http_client
     noise_core minimp3
     esp_lcd esp_adc esp_driver_i2s esp_driver_ledc esp_driver_spi esp_driver_uart esp_wifi
-    esp_driver_pcnt)
+    esp_driver_pcnt esp_netif)
 list(APPEND muse_priv_requires camera)
 if(IDF_TARGET STREQUAL "esp32p4")
     # The Tab5's camera (tab5_camera.c): requirements are resolved before the
