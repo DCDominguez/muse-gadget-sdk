@@ -32,6 +32,7 @@ if(CONFIG_MUSE_ENABLED)
         "muse_audio.c"
         "muse_pmu.c"
         "muse_input.c"
+        "muse_imu.c"
         "muse_menu.c"
         "muse_voice.c"
         "muse_adpcm.c"
@@ -41,7 +42,8 @@ if(CONFIG_MUSE_ENABLED)
         "muse_keypad.c"
         "muse_lv_mem.c"
         "muse_link.c"
-        "muse_ble.c")
+        "muse_ble.c"
+        "muse_dock.c")
     if(CONFIG_MUSE_HATCH)
         list(APPEND srcs "muse_chat.c" "muse_account_api.c" "muse_chat_session.cpp")
         list(APPEND embed "test_reply.mp3")   # muse_hatch_mp3_selftest
@@ -51,6 +53,15 @@ if(CONFIG_MUSE_ENABLED)
     list(APPEND srcs "muse_chat_text.c")
     if(CONFIG_MUSE_CJK_FONT)
         list(APPEND srcs "fonts/muse_font_cjk_16.c")   # captions' CJK fallback
+    endif()
+    if(CONFIG_MUSE_EMOJI_FONT)
+        list(APPEND srcs "fonts/muse_font_emoji_16.c")   # the dock chat's emoji fallback
+    endif()
+    if(CONFIG_MUSE_PIXEL_THEME)
+        # the dock's pixel look: Pixelify Sans and Silkscreen
+        list(APPEND srcs "fonts/muse_font_pixel_19.c" "fonts/muse_font_pixel_30.c" "fonts/muse_font_label_16.c"
+             "muse_scene.c"     # the night sky and island behind a see-through Muse
+             "muse_props.c")    # Cosmo's work props, in Muse's own pixel style
     endif()
     # Your own character (tools/muse/AVATAR_RECIPE.md) stands in for the default
     # avatar when avatar/muse_pixel.c exists here; this avatar/ is gitignored. The
@@ -94,6 +105,11 @@ if(CONFIG_MUSE_ENABLED)
         list(APPEND srcs "boards/board_guition_jc3248w535.c")
     elseif(CONFIG_MUSE_BOARD_WAVESHARE_S3_LCD7)
         list(APPEND srcs "boards/board_waveshare_s3_lcd7.c")
+    elseif(CONFIG_MUSE_BOARD_M5STACK_TAB5)
+        list(APPEND srcs "boards/board_m5stack_tab5.c")
+        if(CONFIG_MUSE_TAB5_CAMERA)
+            list(APPEND srcs "boards/tab5_camera.c")
+        endif()
     endif()
 elseif(CONFIG_HOMEHUB_VOICE)
     # The Voice PE board uses just the Hatch voice session; the project's main/
@@ -107,8 +123,13 @@ set(muse_priv_requires
     bt esp-tls mbedtls esp_app_format esp_http_client
     noise_core minimp3
     esp_lcd esp_adc esp_driver_i2s esp_driver_ledc esp_driver_spi esp_driver_uart esp_wifi
-    esp_driver_pcnt)
+    esp_driver_pcnt esp_netif)
 list(APPEND muse_priv_requires camera)
+if(IDF_TARGET STREQUAL "esp32p4")
+    # The Tab5's camera (tab5_camera.c): requirements are resolved before the
+    # configuration is loaded, so this keys on the target.
+    list(APPEND muse_priv_requires esp_driver_jpeg esp_driver_ppa)
+endif()
 
 idf_component_register(
     SRCS ${srcs}

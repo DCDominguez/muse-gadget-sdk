@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(srcs "camera.c" "sscma_proto.c" "camera_sscma.c")
+set(srcs "camera.c" "camera_base64.c" "sscma_proto.c" "camera_sscma.c")
 
 idf_component_register(
     SRCS ${srcs}

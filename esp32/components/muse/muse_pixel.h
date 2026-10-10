@@ -38,7 +38,25 @@ typedef struct {
     float mode_t;    /* seconds in current mode */
     float level;     /* 0..1 live audio level */
     float happy;     /* 0..1 pet reaction */
+    /* Reactions, each 0 when not happening, else 0..1 through it. An avatar
+     * that ignores them still renders; the default one does. */
+    float dizzy;     /* shaken: wobble with spiral eyes and stars, sit dazed, stand back up (MUSE_DIZZY_S) */
+    float sleepy;    /* before the screen goes dark: yawn, eyes droop and close, snore Zzz (MUSE_SLEEPY_S) */
+    float waking;    /* the screen came on: quick blinks, a stretch, alert (MUSE_WAKING_S) */
+    float tickle;    /* tickled on the screen: startle, then squirm and giggle while it lasts, then
+                      * catch his breath (MUSE_TICKLE_S; held below MUSE_TICKLE_HOLD while it continues) */
+    /* Which way Muse faces, in radians: 0 towards you (as always before),
+     * +pi/2 to the screen's right, pi away, -pi/2 to the left. An avatar that
+     * ignores it always faces you. */
+    float facing;
+    float walk;      /* 0 standing, 1 walking: the feet step */
 } muse_pose_t;
+
+#define MUSE_DIZZY_S 4.0f
+#define MUSE_SLEEPY_S 4.0f
+#define MUSE_WAKING_S 1.5f
+#define MUSE_TICKLE_S 3.0f
+#define MUSE_TICKLE_HOLD 0.8f   /* the giggle loop runs from ~0.15 to here while tickling goes on */
 
 /* Accent colour of a mode (for the surrounding UI), as 0xRRGGBB. */
 uint32_t muse_pixel_accent(muse_mode_t mode);
@@ -55,3 +73,11 @@ void muse_pixel_set_size(int px);
  * image never has to exist in RAM.
  */
 void muse_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1);
+
+/*
+ * The same pixels' opacity, one byte each, stride_px apart: 0 where only the
+ * background shows, 255 where Muse (or the glow and sparkles around Muse) is.
+ * Lets a screen with its own scenery show it around Muse. An avatar without
+ * it is drawn opaque (muse_ui has a fallback).
+ */
+void muse_pixel_scale_alpha(uint8_t *dst, int stride_px, int x0, int x1, int y0, int y1);

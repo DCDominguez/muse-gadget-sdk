@@ -291,6 +291,22 @@ int main(void) {
         self.assertIn("ensure_access_token_ready_with_gate_held(false, true)",
                       app_run[maintenance:])
 
+    def test_one_refresh_rejection_does_not_unpair(self) -> None:
+        # A rejected refresh token clears the pairing only after several
+        # rejections spread over a while; a passing server failure must not
+        # wipe the pairing and restart the device into a setup loop.
+        ensure = _function_body(
+            self.app, "static bool ensure_access_token_ready_with_gate_held("
+        )
+        auth = ensure.index("if (rc == VM_API_ERR_AUTH)")
+        keep = ensure.index("s_refresh_rejections < REVOKE_AFTER_REJECTIONS", auth)
+        revoke = ensure.index('handle_token_revoked_unlocked("device token refresh")', auth)
+        self.assertLess(keep, revoke)
+        self.assertIn("now - s_first_refresh_rejection_us < REVOKE_AFTER_US", ensure)
+        # a refresh that works starts the count again
+        ok = ensure.index("if (rc == 0)")
+        self.assertIn("s_refresh_rejections = 0;", ensure[ok:auth])
+
     def test_button_cannot_race_boot_setup_migration(self) -> None:
         app_run = _function_body(self.app, "void app_run(")
         state_read = app_run.index("bool setup_complete = config_setup_complete()")

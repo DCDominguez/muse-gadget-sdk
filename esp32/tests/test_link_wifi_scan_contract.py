@@ -43,7 +43,7 @@ class LinkWifiScanContractTest(unittest.TestCase):
     device, so a dual-band/mesh network isn't shown several times."""
 
     def test_scan_collapses_to_one_entry_per_ssid(self) -> None:
-        body = _function_body(WIFI_MGR_C.read_text(), "int wifi_mgr_scan(")
+        body = _function_body(WIFI_MGR_C.read_text(), "static int scan(")
 
         # Dedup by SSID name.
         self.assertIn("strcmp(out[j].ssid, ssid) == 0", body)
@@ -58,18 +58,26 @@ class LinkWifiScanContractTest(unittest.TestCase):
         self.assertIn("return n;", body)
 
     def test_scan_relies_on_driver_rssi_order_no_manual_resort(self) -> None:
-        body = _function_body(WIFI_MGR_C.read_text(), "int wifi_mgr_scan(")
+        body = _function_body(WIFI_MGR_C.read_text(), "static int scan(")
         # esp_wifi_scan_get_ap_records returns RSSI-desc, so deduping in order
         # keeps the strongest BSSID first and the result stays RSSI-ordered —
         # no manual re-sort.
         self.assertNotIn("qsort(", body)
 
     def test_scan_retains_cached_bssids_missed_by_refresh(self) -> None:
-        body = _function_body(WIFI_MGR_C.read_text(), "int wifi_mgr_scan(")
+        body = _function_body(WIFI_MGR_C.read_text(), "static int scan(")
 
         self.assertIn("strcmp(s_bssid_cache[j].ssid, ssid) == 0", body)
         self.assertIn("cached = s_bssid_cache_count++", body)
         self.assertNotIn("s_bssid_cache_count =", body)
+
+    def test_public_scan_is_the_active_scan(self) -> None:
+        # wifi_mgr_scan and the console's passive scan share scan()'s body.
+        source = WIFI_MGR_C.read_text()
+        self.assertIn("return scan(out, max_entries, channel, target_ssid, false);",
+                      _function_body(source, "int wifi_mgr_scan("))
+        self.assertIn("return scan(out, max_entries, channel, NULL, true);",
+                      _function_body(source, "int wifi_mgr_scan_passive("))
 
     def test_connect_preempts_background_scan_and_checks_start(self) -> None:
         source = WIFI_MGR_C.read_text()
@@ -89,7 +97,7 @@ class LinkWifiScanContractTest(unittest.TestCase):
         self.assertIn("#define MAX_INITIAL_RETRY        3", source)
 
     def test_scan_yields_to_pending_connect(self) -> None:
-        body = _function_body(WIFI_MGR_C.read_text(), "int wifi_mgr_scan(")
+        body = _function_body(WIFI_MGR_C.read_text(), "static int scan(")
 
         self.assertGreaterEqual(body.count("s_connect_pending"), 2)
         self.assertLess(

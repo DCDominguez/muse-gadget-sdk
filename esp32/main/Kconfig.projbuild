@@ -275,6 +275,22 @@ menu "ESP32 Device SDK"
             temperature and humidity need the Grove AHT20. Needs Seeed's stock
             RP2040 firmware.
 
+    config HOMEHUB_BULLETIN
+        bool "Bulletin board for Muse (bulletin.read)"
+        default y if MUSE_BOARD_M5STACK_TAB5
+        default n
+        help
+            Builds a notes file into the firmware and offers Muse the
+            bulletin.read command to read it: what's new in this build and
+            what's being worked on, so the owner can ask their Muse about
+            it. The file is tab5/BULLETIN.md, or another set in
+            HOMEHUB_BULLETIN_FILE.
+
+    config HOMEHUB_BULLETIN_FILE
+        string "Bulletin file, relative to esp32/main"
+        depends on HOMEHUB_BULLETIN
+        default "../../tab5/BULLETIN.md"
+
     config HOMEHUB_DISPLAY_COMMANDS
         bool
         default y if HOMEHUB_DISPLAY

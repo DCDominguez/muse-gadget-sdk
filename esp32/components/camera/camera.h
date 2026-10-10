@@ -73,6 +73,12 @@ esp_err_t camera_capture(camera_frame_t *out);
 void camera_release(camera_frame_t *frame);
 
 /*
+ * One frame as base64 JPEG, for camera.capture's result: free() it. NULL with
+ * *error saying why (no camera, busy, the backend's failure, no memory).
+ */
+char *camera_capture_base64(const char **error);
+
+/*
  * Calls on_frame with each frame until camera_stream_stop(), which returns
  * once no more will come. A stream holds the camera as a frame does: capture
  * and another stream return ESP_ERR_INVALID_STATE meanwhile. Starts the

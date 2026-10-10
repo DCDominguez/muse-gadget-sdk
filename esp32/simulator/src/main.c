@@ -33,6 +33,7 @@
 
 #include "muse_state.h"
 #include "muse_ui.h"
+#include "muse_dock.h"
 #include "sim_board.h"
 #include "sim_platform.h"
 #include "sim_services.h"
@@ -56,8 +57,8 @@ static char s_ble_name[32] = "MuseGadget-SIM001";
 static void usage(FILE *out, const char *argv0)
 {
     fprintf(out,
-            "Usage: %s [--headless] [--scenario FILE] [--run-ms N] "
-            "[--screenshot FILE.ppm]\n"
+            "Usage: %s [--board watcher|tab5] [--headless] [--scenario FILE] "
+            "[--run-ms N] [--screenshot FILE.ppm]\n"
             "\n"
             "Scenario lines are key=value. Supported keys:\n"
             "  face=boot|idle|listening|thinking|speaking|error|off|happy\n"
@@ -68,6 +69,10 @@ static void usage(FILE *out, const char *argv0)
             "  ble=off|advertising|connected         passkey=0..999999\n"
             "  paired=true|false  link=boot|unpaired|pairing|confirm|connecting|online|offline|error\n"
             "  speaker=true|false brightness=10..100 advance=MILLISECONDS\n"
+            "  tap=X,Y (a touch and release)\n"
+            "  react=dizzy|drowse|wake|tickle (the avatar's reactions)\n"
+            "  --board tab5 only: keyboard=true|false (Tab5 Keyboard attached)\n"
+            "  type=TEXT|enter|backspace|esc (keys from the keyboard to the chat)\n"
             "\n"
             "Interactive keys: F1..F7 select face states, H is happy, Space is\n"
             "push-to-talk, +/- change level, [/] change progress, S sleeps,\n"
@@ -361,6 +366,51 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
         sim_services_set_brightness((int)number);
         return true;
     }
+    if (!strcmp(key, "tap")) {
+        long x, y;
+        char extra;
+        if (sscanf(value, "%ld,%ld%c", &x, &y, &extra) != 2 || x < 0 || y < 0 || x > 4095 || y > 4095) {
+            return false;
+        }
+        sim_board_tap((int)x, (int)y, true);
+        render_for(80, real_time);
+        sim_board_tap((int)x, (int)y, false);
+        render_for(80, real_time);
+        return true;
+    }
+    if (!strcmp(key, "keyboard") && parse_bool(value, &flag)) {
+        sim_board_set_keyboard(flag);
+        return true;
+    }
+    if (!strcmp(key, "type")) {
+        if (!strcmp(value, "enter")) {
+            muse_dock_key(LV_KEY_ENTER);
+        } else if (!strcmp(value, "backspace")) {
+            muse_dock_key(LV_KEY_BACKSPACE);
+        } else if (!strcmp(value, "esc")) {
+            muse_dock_key(LV_KEY_ESC);
+        } else {
+            for (const char *c = value; *c; c++) {
+                muse_dock_key((uint8_t)*c);
+            }
+        }
+        return true;
+    }
+    if (!strcmp(key, "react")) {
+        /* The avatar's reactions, as shaking, idling, waking or rubbing start them. */
+        if (!strcmp(value, "dizzy")) {
+            muse_state_start_dizzy();
+        } else if (!strcmp(value, "drowse")) {
+            muse_state_start_drowsing(0.0f);
+        } else if (!strcmp(value, "wake")) {
+            muse_state_end_drowsing();
+        } else if (!strcmp(value, "tickle")) {
+            muse_state_start_tickle();
+        } else {
+            return false;
+        }
+        return true;
+    }
     if (!strcmp(key, "advance") && parse_long(value, 0, 3600000, &number)) {
         render_for((uint32_t)number, real_time);
         return true;
@@ -474,7 +524,12 @@ int main(int argc, char **argv)
     uint32_t run_ms = 1000;
     bool headless = false;
     for (int i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "--headless")) {
+        if (!strcmp(argv[i], "--board") && i + 1 < argc) {
+            if (!sim_board_select(argv[++i])) {
+                fprintf(stderr, "unknown --board: %s (watcher or tab5)\n", argv[i]);
+                return 2;
+            }
+        } else if (!strcmp(argv[i], "--headless")) {
             headless = true;
         } else if (!strcmp(argv[i], "--scenario") && i + 1 < argc) {
             scenario = argv[++i];

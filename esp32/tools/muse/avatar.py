@@ -73,8 +73,9 @@ BOARDS = {
     "Freenove FNK0104B": "fnk0104b",
     "Guition JC3248W535": "jc3248w535",
     "Waveshare ESP32-S3-Touch-LCD-7": "lcd7",
+    "M5Stack Tab5": "tab5",
 }
-CHAT_BOARDS = ("s3", "s3n", "aipi", "box3", "sticks3", "watcher", "stopwatch", "cores3", "core2", "fnk0104b", "jc3248w535", "lcd7")
+CHAT_BOARDS = ("s3", "s3n", "aipi", "box3", "sticks3", "watcher", "stopwatch", "cores3", "core2", "fnk0104b", "jc3248w535", "lcd7", "tab5")
 
 
 class Stop(Exception):

@@ -51,6 +51,8 @@ static const char *TAG = "muse_voice";
 #endif
 #define SETTLE_CHUNKS 10   /* after Muse makes a sound, 200 ms of capture is its own tail */
 #define REST_BACKSTOP_MS 60000
+#define SNORE_STALE_MS 500    /* a snore asked for longer ago than this is dropped */
+#define SNORE_AMP 1100.0f     /* peak; the chirp's is ~7000: about 16 dB quieter */
 
 #if CONFIG_MUSE_HATCH
 /* A note recorded while Hatch is out of reach is saved in PSRAM, and goes once it's back. */
@@ -73,6 +75,7 @@ static volatile float s_monitor_db = -100.0f;
 static volatile bool s_chirp;
 static volatile bool s_loopback;
 static volatile bool s_mp3test;
+static volatile uint32_t s_snore_ms;   /* when a snore was asked for (ms since boot), 0 for none */
 
 /*
  * Pre-roll: while idle the mic keeps running into this ring, so a recording
@@ -343,11 +346,12 @@ static void go_idle(const char *caption);
 /*
  * Plays Hatch's reply as it arrives, with its text as the caption. Returns
  * true if interrupted by a new press. *delivered: the VM has the note.
+ * `waiting` is the caption until there's a transcript or reply.
  */
-static bool hatch_reply(bool *delivered)
+static bool hatch_reply_as(bool *delivered, const char *waiting)
 {
     muse_state_set_mode(MUSE_MODE_THINKING);
-    muse_state_set_caption("SENDING VOICE NOTE");   /* until there's a transcript or reply */
+    muse_state_set_caption("%s", waiting);
     static int16_t buf[MUSE_AUDIO_CHUNK];
     static const int16_t silence[MUSE_AUDIO_CHUNK];
     char text[96];
@@ -427,6 +431,23 @@ static bool hatch_reply(bool *delivered)
         vTaskDelay(pdMS_TO_TICKS(2500));
     }
     return false;
+}
+
+static bool hatch_reply(bool *delivered)
+{
+    return hatch_reply_as(delivered, "SENDING VOICE NOTE");
+}
+
+/* A push from Muse: wake the screen and play it like a reply. True if a
+ * press interrupted it, to be recorded as one. (wupsbr/waveshare-muse-gadget-sdk) */
+static bool play_push(void)
+{
+    ESP_LOGI(TAG, "playing a push from Muse");
+    muse_state_set_asleep(false);
+    muse_state_poke();
+    muse_wifi_power(MUSE_WIFI_FULL);
+    bool delivered;
+    return hatch_reply_as(&delivered, "");
 }
 
 static void go_idle(const char *caption)
@@ -786,6 +807,57 @@ static bool can_record(void)
     return true;
 }
 
+static uint32_t now_ms(void)
+{
+    return (uint32_t)(esp_timer_get_time() / 1000);
+}
+
+/*
+ * One soft snore, about 0.8 s, made up as it plays: a fluttering rumble that
+ * rises through the inhale (60-90 Hz, with harmonics a small speaker can
+ * reproduce, over breathy low-passed noise), then a quieter exhale of air.
+ * Stops early for a press or if drowsing is interrupted, so it never holds up
+ * a recording.
+ */
+static void play_snore(void)
+{
+    enum { IN_FRAMES = MUSE_AUDIO_RATE * 55 / 100, OUT_FRAMES = MUSE_AUDIO_RATE / 4 };
+    static int which;
+    static uint32_t seed = 0x9E3779B9u;
+    float base_hz = which++ & 1 ? 70.0f : 62.0f;   /* two in a row don't sound the same */
+    float phase = 0, lp_in = 0, lp_out = 0;
+    int16_t buf[MUSE_AUDIO_CHUNK];
+    for (int done = 0; done < IN_FRAMES + OUT_FRAMES; done += MUSE_AUDIO_CHUNK) {
+        if (uxQueueMessagesWaiting(s_queue) || (muse_state_sleepy() == 0 && !muse_state_asleep())) {
+            break;
+        }
+        for (int i = 0; i < MUSE_AUDIO_CHUNK; i++) {
+            int n = done + i;
+            float t = (float)n / MUSE_AUDIO_RATE;
+            seed = seed * 1664525u + 1013904223u;
+            float noise = (float)(int32_t)seed / 2147483648.0f;
+            float v = 0;
+            if (n < IN_FRAMES) {
+                float x = (float)n / IN_FRAMES;
+                float env = sinf((float)M_PI * x);
+                env *= env;
+                phase += 2.0f * (float)M_PI * (base_hz + 20.0f * x) / MUSE_AUDIO_RATE;
+                float tone = (sinf(phase) + 0.6f * sinf(2 * phase) + 0.35f * sinf(3 * phase)
+                              + 0.2f * sinf(4 * phase)) / 2.15f;
+                float flutter = 0.55f + 0.45f * sinf(2.0f * (float)M_PI * 25.0f * t);
+                lp_in += 0.18f * (noise - lp_in);   /* one pole, ~500 Hz */
+                v = env * (0.75f * tone * flutter + 0.5f * lp_in);
+            } else if (n < IN_FRAMES + OUT_FRAMES) {
+                float y = (float)(n - IN_FRAMES) / OUT_FRAMES;
+                lp_out += 0.3f * (noise - lp_out);  /* ~900 Hz */
+                v = 0.35f * sinf((float)M_PI * y) * lp_out;
+            }
+            buf[i] = (int16_t)(v * SNORE_AMP);
+        }
+        muse_audio_write(buf, MUSE_AUDIO_CHUNK);
+    }
+}
+
 static void voice_task(void *arg)
 {
     bool pending_down = false;
@@ -828,6 +900,14 @@ static void voice_task(void *arg)
                 muse_audio_chirp(1);
                 pre_reset();
             }
+            if (s_snore_ms) {
+                uint32_t asked = s_snore_ms;
+                s_snore_ms = 0;
+                if (now_ms() - asked < SNORE_STALE_MS && muse_settings_speaker_on()) {
+                    play_snore();
+                    pre_reset();
+                }
+            }
             if (s_mp3test) {
                 s_mp3test = false;
                 int16_t *pcm = NULL;
@@ -846,8 +926,17 @@ static void voice_task(void *arg)
             /* The 20 ms read paces this loop. */
             idle_capture();
             if (xQueueReceive(s_queue, &ev, 0) != pdTRUE) {
+                if (muse_hatch_push_take()) {
+                    pending_down = play_push();
+                    pre_reset();
+                    if (!pending_down && muse_state_mode(NULL) != MUSE_MODE_IDLE) {
+                        muse_state_make_happy();
+                        go_idle("");
+                    }
+                }
                 continue;
             }
+            muse_hatch_push_drop();   /* a press goes first; its turn replaces the push's */
             muse_state_poke();
             if (ev.type != MUSE_PTT_DOWN) {
                 continue;
@@ -919,6 +1008,12 @@ void muse_voice_request_chirp(void)
 {
     s_chirp = true;
     muse_state_nudge();
+}
+
+void muse_voice_request_snore(void)
+{
+    uint32_t ms = now_ms();
+    s_snore_ms = ms ? ms : 1;
 }
 
 void muse_voice_request_loopback(void)

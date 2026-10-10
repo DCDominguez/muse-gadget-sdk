@@ -34,7 +34,19 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#if CONFIG_JD_SZBUF
+// No decoder in ROM (ESP32-P4): espressif/esp_jpeg's copy of the same
+// TJpgDec, a later release with size_t lengths and an int output callback.
+#include "tjpgd.h"
+typedef size_t jpeg_len_t;
+typedef int jpeg_out_t;
+typedef uint8_t jpeg_byte_t;
+#else
 #include "rom/tjpgd.h"
+typedef UINT jpeg_len_t;
+typedef UINT jpeg_out_t;
+typedef BYTE jpeg_byte_t;
+#endif
 
 static const char *TAG = "link.image";
 
@@ -209,25 +221,25 @@ static const char *draw_raw(fetch_t *f, int *rows_drawn) {
 
 // ---- JPEG --------------------------------------------------------------------
 
-static UINT jpeg_in(JDEC *jd, BYTE *buf, UINT len) {
+static jpeg_len_t jpeg_in(JDEC *jd, jpeg_byte_t *buf, jpeg_len_t len) {
     fetch_t *f = jd->device;
     if (buf) {
         int n = fetch_read(f, buf, len);
-        return n < 0 ? 0 : (UINT)n;
+        return n < 0 ? 0 : (jpeg_len_t)n;
     }
     // Skip: read into the MCU buffer, which is free between output calls.
-    UINT skipped = 0;
+    jpeg_len_t skipped = 0;
     while (skipped < len) {
-        UINT chunk = len - skipped;
+        jpeg_len_t chunk = len - skipped;
         if (chunk > sizeof(f->mcu)) chunk = sizeof(f->mcu);
         int n = fetch_read(f, (uint8_t *)f->mcu, chunk);
         if (n <= 0) break;
-        skipped += (UINT)n;
+        skipped += (jpeg_len_t)n;
     }
     return skipped;
 }
 
-static UINT jpeg_out(JDEC *jd, void *bitmap, JRECT *rect) {
+static jpeg_out_t jpeg_out(JDEC *jd, void *bitmap, JRECT *rect) {
     fetch_t *f = jd->device;
     int w = rect->right - rect->left + 1;
     int h = rect->bottom - rect->top + 1;

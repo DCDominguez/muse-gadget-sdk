@@ -58,6 +58,8 @@ static void turn_fail(const char *) { turn_finish(); }
 static bool ensure_connected() { return true; }
 bool muse_hatch_configured() { return true; }
 static void resampler_init(resampler_t *, int, int) {}
+/* This fork's pushes live outside the extracted handlers (All messages). */
+static void push_maybe_begin(const char *, cJSON *, cJSON *) {}
 ''' + reset + handlers + r'''
 static void begin(bool typed = false) {
     assert(turn_start(s_turn.gen + 1, typed));

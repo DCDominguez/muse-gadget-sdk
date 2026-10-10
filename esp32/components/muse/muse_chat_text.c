@@ -224,11 +224,20 @@ static size_t escape_some(const char **src, char *out, size_t cap)
     return o;
 }
 
+static muse_hatch_console_hook_t s_hook;
+
+void muse_hatch_set_console_hook(muse_hatch_console_hook_t hook)
+{
+    __atomic_store_n(&s_hook, hook, __ATOMIC_RELEASE);
+}
+
 /* Each line goes out in one write, so other tasks' log lines land between lines, not inside them. */
 void muse_hatch_console(const char *type, const char *text, const char *fields, ...)
 {
     static unsigned seq;
     char line[CONSOLE_LINE];
+    muse_hatch_console_hook_t hook = __atomic_load_n(&s_hook, __ATOMIC_ACQUIRE);
+    const char *formatted = "";
     do {
         size_t n = snprintf(line, sizeof(line), "@chat {\"seq\":%u,\"type\":\"%s\"",
                             __atomic_add_fetch(&seq, 1, __ATOMIC_RELAXED), type);
@@ -236,8 +245,16 @@ void muse_hatch_console(const char *type, const char *text, const char *fields, 
             va_list ap;
             va_start(ap, fields);
             line[n++] = ',';
+            if (hook && !formatted[0]) {
+                formatted = line + n;
+            }
             n += vsnprintf(line + n, sizeof(line) - n, fields, ap);
             va_end(ap);
+        }
+        if (hook) {
+            /* Once, before the text is escaped into the line. */
+            hook(type, text, formatted);
+            hook = NULL;
         }
         if (n > sizeof(line) - CONSOLE_TEXT - 16) {
             n = sizeof(line) - CONSOLE_TEXT - 16;   /* never: fields are short */

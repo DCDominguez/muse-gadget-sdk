@@ -16,6 +16,7 @@
 
 #include "muse_settings.h"
 
+#include <ctype.h>
 #include <string.h>
 
 #include "esp_log.h"
@@ -30,10 +31,16 @@ static const char *TAG = "muse_settings";
 
 #define NS "muse"
 #define DEFAULT_HOST "hatch.metaaivm.com"
+#ifdef CONFIG_MUSE_TTS_VOICE
+#define DEFAULT_TTS_VOICE CONFIG_MUSE_TTS_VOICE
+#else
+#define DEFAULT_TTS_VOICE ""
+#endif
 
 static struct {
     uint8_t volume;
     bool speaker_on;
+    bool pushes_on;
     uint8_t mic_gain;
     uint8_t brightness;
     uint16_t sleep_s;
@@ -44,6 +51,8 @@ static struct {
     char host[MUSE_HOST_MAX + 1];
     char vm[MUSE_VM_MAX + 1];
     char token[MUSE_TOKEN_MAX + 1];
+    char tts_url[MUSE_TTS_URL_MAX + 1];
+    char tts_voice[MUSE_TTS_VOICE_MAX + 1];
 } s = {
     .volume = CONFIG_MUSE_DEFAULT_VOLUME,
     .speaker_on = true,
@@ -52,6 +61,7 @@ static struct {
     .sleep_s = 120,
     .wifi_on = true,
     .host = DEFAULT_HOST,
+    .tts_voice = DEFAULT_TTS_VOICE,
 };
 
 static SemaphoreHandle_t s_lock;
@@ -118,6 +128,9 @@ esp_err_t muse_settings_init(void)
     if (nvs_get_u8(s_nvs, "speaker", &b) == ESP_OK) {
         s.speaker_on = b;
     }
+    if (nvs_get_u8(s_nvs, "pushes", &b) == ESP_OK) {
+        s.pushes_on = b;
+    }
     load_u8("mic_gain", &s.mic_gain);
     load_u8("bright", &s.brightness);
     nvs_get_u16(s_nvs, "sleep_s", &s.sleep_s);
@@ -132,10 +145,13 @@ esp_err_t muse_settings_init(void)
     load_str("host", s.host, sizeof(s.host));
     load_str("vm", s.vm, sizeof(s.vm));
     load_str("token", s.token, sizeof(s.token));
+    load_str("tts_url", s.tts_url, sizeof(s.tts_url));
+    load_str("tts_voice", s.tts_voice, sizeof(s.tts_voice));
 
     s.volume = clampi(s.volume, 0, 100);
     s.mic_gain = clampi(s.mic_gain, 0, MUSE_MIC_GAIN_MAX);
     s.brightness = clampi(s.brightness, 10, 100);
+    ESP_LOGI(TAG, "all messages %s, speech server %s", s.pushes_on ? "on" : "off", s.tts_url[0] ? s.tts_url : "none");
     ESP_LOGI(TAG, "vol %d%s, mic %d dB, bright %d, sleep %ds, wifi %s (%s), ble %s, muse %s",
              s.volume, s.speaker_on ? "" : " (speaker off)", s.mic_gain, s.brightness, s.sleep_s, s.wifi_on ? "on" : "off",
              "network saved by Link", s.ble_on ? "on" : "off", s.token[0] ? "token set" : "no token");
@@ -149,6 +165,7 @@ void muse_settings_set_listener(muse_setting_cb_t cb)
 
 int muse_settings_volume(void) { return s.volume; }
 bool muse_settings_speaker_on(void) { return s.speaker_on; }
+bool muse_settings_pushes_on(void) { return s.pushes_on; }
 int muse_settings_mic_gain(void) { return s.mic_gain; }
 int muse_settings_brightness(void) { return s.brightness; }
 int muse_settings_sleep_s(void) { return s.sleep_s; }
@@ -205,6 +222,13 @@ void muse_settings_set_speaker_on(bool on)
     notify(MUSE_SETTING_SPEAKER);
 }
 
+void muse_settings_set_pushes_on(bool on)
+{
+    s.pushes_on = on;
+    save_u8("pushes", on);
+    notify(MUSE_SETTING_PUSHES);
+}
+
 void muse_settings_set_mic_gain(int db)
 {
     s.mic_gain = clampi(db, 0, MUSE_MIC_GAIN_MAX);
@@ -256,6 +280,61 @@ void muse_settings_set_wifi(const char *ssid, const char *pass)
     });
     ESP_LOGI(TAG, "wifi network: %s", s.ssid[0] ? s.ssid : "(forgotten)");
     notify(MUSE_SETTING_WIFI);
+}
+
+void muse_settings_tts_url(char out[MUSE_TTS_URL_MAX + 1])
+{
+    LOCKED(strlcpy(out, s.tts_url, MUSE_TTS_URL_MAX + 1));
+}
+
+void muse_settings_tts_voice(char out[MUSE_TTS_VOICE_MAX + 1])
+{
+    LOCKED(strlcpy(out, s.tts_voice, MUSE_TTS_VOICE_MAX + 1));
+}
+
+bool muse_settings_set_tts_url(const char *url)
+{
+    if (!url) {
+        url = "";
+    }
+    size_t n = strlen(url);
+    if (n > MUSE_TTS_URL_MAX) {
+        return false;
+    }
+    if (n && strncmp(url, "http://", 7) != 0 && strncmp(url, "https://", 8) != 0) {
+        return false;
+    }
+    for (size_t i = 0; i < n; i++) {
+        if (url[i] <= ' ' || url[i] == '"' || url[i] == '\\' || url[i] >= 0x7f) {
+            return false;
+        }
+    }
+    LOCKED({
+        strlcpy(s.tts_url, url, sizeof(s.tts_url));
+        save_str("tts_url", s.tts_url);
+    });
+    return true;
+}
+
+bool muse_settings_set_tts_voice(const char *voice)
+{
+    if (!voice) {
+        voice = "";
+    }
+    if (strlen(voice) > MUSE_TTS_VOICE_MAX) {
+        return false;
+    }
+    for (const char *c = voice; *c; c++) {
+        /* names and Kokoro's blends, as in af_bella(2)+af_sky(1) */
+        if (!isalnum((unsigned char)*c) && !strchr("_-.+,()", *c)) {
+            return false;
+        }
+    }
+    LOCKED({
+        strlcpy(s.tts_voice, voice && voice[0] ? voice : DEFAULT_TTS_VOICE, sizeof(s.tts_voice));
+        save_str("tts_voice", s.tts_voice);
+    });
+    return true;
 }
 
 void muse_settings_set_hatch_host(const char *host)

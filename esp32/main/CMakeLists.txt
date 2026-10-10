@@ -63,6 +63,7 @@ set(GADGET_REQUIRES
     mbedtls
     efuse
     muse
+    camera
     # The voice board's. Requirements are resolved before the configuration
     # is loaded, so this is unconditional; unused code is not linked.
     esp_driver_i2s
@@ -102,9 +103,21 @@ if(CONFIG_HOMEHUB_VOICE)
     endif()
 endif()
 
+# Notes Muse reads with bulletin.read, built in as the symbol "bulletin".
+set(GADGET_EMBED "")
+if(CONFIG_HOMEHUB_BULLETIN AND NOT CMAKE_BUILD_EARLY_EXPANSION)
+    list(APPEND GADGET_SRCS "bulletin.c")
+    get_filename_component(bulletin_file "${CONFIG_HOMEHUB_BULLETIN_FILE}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+    # Under one name whatever the file's called, so its symbol stays put; a
+    # change to the file reruns CMake and so rebuilds it.
+    configure_file("${bulletin_file}" "${CMAKE_CURRENT_BINARY_DIR}/bulletin.md" COPYONLY)
+    list(APPEND GADGET_EMBED "${CMAKE_CURRENT_BINARY_DIR}/bulletin.md")
+endif()
+
 idf_component_register(
     SRCS ${GADGET_SRCS}
     INCLUDE_DIRS "."
     PRIV_INCLUDE_DIRS "../avatar"
     REQUIRES ${GADGET_REQUIRES}
+    EMBED_TXTFILES ${GADGET_EMBED}
 )

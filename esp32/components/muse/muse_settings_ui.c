@@ -32,6 +32,7 @@
 #include "muse_input.h"
 #include "muse_keypad.h"
 #include "muse_link.h"
+#include "muse_pixel_style.h"
 #include "muse_settings.h"
 #include "muse_state.h"
 #include "muse_text.h"
@@ -45,6 +46,28 @@
 #define ROW_H 58
 #define MAX_APS 12
 
+#if CONFIG_MUSE_PIXEL_THEME
+/* Beside a docked Muse (the Tab5): the dock's pixel look, in a window where
+ * the chat goes (muse_dock.c), with square notched boxes and pixel fonts. */
+#define COLOR_TEXT C_CREAM
+#define COLOR_DIM C_DIM
+#define COLOR_CARD C_TILE
+#define COLOR_CARD_PRESSED C_TILE_DOWN
+#define COLOR_ACCENT C_LAV
+#define COLOR_OK C_MINT
+#define COLOR_WARN C_SUN
+#define COLOR_DANGER C_RED_INK
+#define COLOR_TRACK C_EDGE_BTN
+#define PAD 26                  /* the window's margin, as the dock's pocket */
+#undef ROW_H
+#undef LIST_TOP
+#define ROW_H 64
+#define LIST_TOP 92
+static lv_font_t s_font_row, s_font_small;   /* the pixel fonts, with Montserrat for LVGL's symbols */
+#define FONT_ROW (&s_font_row)
+#define FONT_SMALL (&s_font_small)
+#define FONT_TITLE F_TITLE
+#else
 #define COLOR_TEXT 0xf2efff
 #define COLOR_DIM 0x8b84a8
 #define COLOR_CARD 0x1a1530
@@ -53,11 +76,18 @@
 #define COLOR_OK 0x6ff0bf
 #define COLOR_WARN 0xffb45c
 #define COLOR_DANGER 0xff5c5c
+#define COLOR_TRACK 0x2a2345
+#define FONT_ROW (&lv_font_montserrat_20)
+#define FONT_SMALL (&lv_font_montserrat_16)
+#define FONT_TITLE (&lv_font_unscii_16)
+#endif
 
 typedef void (*text_done_cb_t)(const char *text);
 
 /* The screen size the text page is scaled to (see text_px). */
 static int s_text_scale = 466;
+/* The space the pages fill: the screen, or a window beside a docked Muse. */
+static int s_pw, s_ph;
 static lv_obj_t *s_tile;
 static lv_obj_t *s_current;
 static lv_obj_t *s_home, *s_wifi, *s_hatch, *s_ble, *s_sound, *s_sleep, *s_battery, *s_power, *s_text;
@@ -73,7 +103,7 @@ typedef struct {
 } page_t;
 
 /* Home values. */
-static lv_obj_t *s_home_wifi, *s_home_hatch, *s_home_ble, *s_home_sound, *s_home_sleep, *s_home_battery, *s_about;
+static lv_obj_t *s_home_wifi, *s_home_hatch, *s_home_pushes, *s_home_ble, *s_home_sound, *s_home_sleep, *s_home_battery, *s_about;
 
 /* Wi-Fi page. */
 static lv_obj_t *s_wifi_sw, *s_wifi_status, *s_wifi_saved, *s_wifi_scan_btn, *s_wifi_scan_lbl, *s_wifi_list;
@@ -141,12 +171,132 @@ static void set_text(lv_obj_t *l, const char *text)
 
 static lv_obj_t *note(lv_obj_t *list, const char *text)
 {
-    lv_obj_t *l = label(list, &lv_font_montserrat_16, COLOR_DIM, text);
+    lv_obj_t *l = label(list, FONT_SMALL, COLOR_DIM, text);
     lv_obj_set_width(l, lv_pct(100));
     lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_WRAP);
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     return l;
 }
+
+#if CONFIG_MUSE_PIXEL_THEME
+/* Pixel icons for the symbols the rows use, on a 9x9 grid: rectangles of
+ * colour, and holes in the row's colour (Cosmo's eyes). */
+typedef struct {
+    uint8_t x, y, w, h;
+} cell_t;
+
+typedef struct {
+    const char *symbol;
+    const cell_t *cells, *holes;
+    uint8_t n, n_holes;
+} pixel_icon_t;
+
+static const cell_t I_WIFI[] = { { 1, 0, 7, 1 }, { 0, 1, 1, 2 }, { 8, 1, 1, 2 }, { 2, 3, 5, 1 }, { 1, 4, 1, 1 },
+                                 { 7, 4, 1, 1 }, { 3, 6, 3, 1 }, { 4, 8, 1, 1 } };
+static const cell_t I_MUSE[] = { { 3, 0, 3, 1 }, { 2, 1, 5, 1 }, { 1, 2, 7, 6 }, { 2, 8, 5, 1 } };
+static const cell_t I_MUSE_EYES[] = { { 3, 4, 1, 1 }, { 5, 4, 1, 1 } };
+static const cell_t I_BELL[] = { { 4, 0, 1, 1 }, { 3, 1, 3, 1 }, { 2, 2, 5, 4 }, { 1, 6, 7, 1 }, { 4, 8, 1, 1 } };
+static const cell_t I_BLE[] = { { 4, 0, 1, 9 }, { 5, 1, 1, 1 }, { 6, 2, 1, 1 }, { 5, 3, 1, 1 }, { 3, 5, 1, 1 },
+                                { 2, 6, 1, 1 }, { 5, 5, 1, 1 }, { 6, 6, 1, 1 }, { 5, 7, 1, 1 }, { 3, 3, 1, 1 },
+                                { 2, 2, 1, 1 } };
+static const cell_t I_SOUND[] = { { 0, 3, 2, 3 }, { 2, 2, 1, 5 }, { 3, 1, 1, 7 }, { 4, 0, 1, 9 }, { 6, 3, 1, 3 },
+                                  { 8, 1, 1, 7 } };
+static const cell_t I_SLEEP[] = { { 2, 0, 3, 1 }, { 1, 1, 2, 1 }, { 0, 2, 2, 4 }, { 1, 6, 2, 1 }, { 2, 7, 6, 1 },
+                                  { 7, 6, 1, 1 }, { 6, 1, 1, 3 }, { 5, 2, 3, 1 } };
+static const cell_t I_BATTERY[] = { { 0, 1, 8, 1 }, { 0, 7, 8, 1 }, { 0, 1, 1, 7 }, { 7, 1, 1, 7 }, { 8, 3, 1, 3 },
+                                    { 2, 3, 4, 3 } };
+static const cell_t I_POWER[] = { { 4, 0, 1, 4 }, { 1, 2, 1, 5 }, { 7, 2, 1, 5 }, { 2, 7, 5, 1 }, { 2, 1, 1, 1 },
+                                  { 6, 1, 1, 1 } };
+static const cell_t I_OTHER[] = { { 4, 1, 1, 7 }, { 1, 4, 7, 1 } };
+static const cell_t I_BACK[] = { { 2, 4, 6, 1 }, { 3, 2, 1, 5 }, { 2, 3, 1, 3 }, { 1, 4, 1, 1 } };
+
+#define N(a) (uint8_t)(sizeof(a) / sizeof(a[0]))
+static const pixel_icon_t ICONS[] = {
+    { LV_SYMBOL_WIFI, I_WIFI, NULL, N(I_WIFI), 0 },
+    { LV_SYMBOL_HOME, I_MUSE, I_MUSE_EYES, N(I_MUSE), N(I_MUSE_EYES) },
+    { LV_SYMBOL_BELL, I_BELL, NULL, N(I_BELL), 0 },
+    { LV_SYMBOL_BLUETOOTH, I_BLE, NULL, N(I_BLE), 0 },
+    { LV_SYMBOL_VOLUME_MAX, I_SOUND, NULL, N(I_SOUND), 0 },
+    { LV_SYMBOL_EYE_CLOSE, I_SLEEP, NULL, N(I_SLEEP), 0 },
+    { LV_SYMBOL_BATTERY_FULL, I_BATTERY, NULL, N(I_BATTERY), 0 },
+    { LV_SYMBOL_POWER, I_POWER, NULL, N(I_POWER), 0 },
+    { LV_SYMBOL_EDIT, I_OTHER, NULL, N(I_OTHER), 0 },
+    { LV_SYMBOL_LEFT, I_BACK, NULL, N(I_BACK), 0 },
+};
+#undef N
+
+#define ICON_CELL 3
+
+static void cells(lv_obj_t *box, const cell_t *c, int n, uint32_t color)
+{
+    for (int i = 0; i < n; i++) {
+        lv_obj_t *r = lv_obj_create(box);
+        lv_obj_remove_style_all(r);
+        lv_obj_remove_flag(r, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_pos(r, c[i].x * ICON_CELL, c[i].y * ICON_CELL);
+        lv_obj_set_size(r, c[i].w * ICON_CELL, c[i].h * ICON_CELL);
+        lv_obj_set_style_bg_color(r, lv_color_hex(color), 0);
+        lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
+    }
+}
+
+/* A row's icon: drawn in pixels when there's art for it, else the symbol. */
+static lv_obj_t *icon(lv_obj_t *parent, const char *symbol, uint32_t color, uint32_t backdrop)
+{
+    for (size_t i = 0; i < sizeof(ICONS) / sizeof(ICONS[0]); i++) {
+        if (!strcmp(ICONS[i].symbol, symbol)) {
+            lv_obj_t *box = lv_obj_create(parent);
+            lv_obj_remove_style_all(box);
+            lv_obj_remove_flag(box, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_add_flag(box, LV_OBJ_FLAG_EVENT_BUBBLE);
+            lv_obj_set_size(box, 9 * ICON_CELL, 9 * ICON_CELL);
+            cells(box, ICONS[i].cells, ICONS[i].n, color);
+            cells(box, ICONS[i].holes, ICONS[i].n_holes, backdrop);
+            return box;
+        }
+    }
+    return label(parent, FONT_ROW, color, symbol);
+}
+
+/* Square, a pixel of border, the corners notched: as the dock's boxes. */
+static void pixel_frame(lv_obj_t *o, uint32_t fill, uint32_t edge, uint32_t pressed)
+{
+    lv_obj_set_style_radius(o, 0, 0);
+    lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(o, lv_color_hex(fill), 0);
+    lv_obj_set_style_bg_color(o, lv_color_hex(pressed), LV_STATE_PRESSED);
+    lv_obj_set_style_border_color(o, lv_color_hex(edge), 0);
+    lv_obj_set_style_border_width(o, PX, 0);
+    muse_pixel_notches(o, C_PANEL);
+}
+
+/* The dock's pages have lowercase titles ("cosmo's pocket"). */
+static const char *title_case(const char *title, char *buf, size_t size)
+{
+    size_t i = 0;
+    for (; title[i] && i + 1 < size; i++) {
+        buf[i] = (title[i] >= 'A' && title[i] <= 'Z') ? (char)(title[i] + 32) : title[i];
+    }
+    buf[i] = '\0';
+    return buf;
+}
+
+/* A square lavender-on-night switch, its knob a cream block. */
+static void pixel_switch(lv_obj_t *sw)
+{
+    lv_obj_set_size(sw, 64, 32);
+    for (int part = 0; part < 3; part++) {
+        lv_style_selector_t sel = part == 0 ? LV_PART_MAIN : part == 1 ? LV_PART_INDICATOR : LV_PART_KNOB;
+        lv_obj_set_style_radius(sw, 0, sel);
+    }
+    lv_obj_set_style_bg_color(sw, lv_color_hex(C_METER_OFF), LV_PART_MAIN);
+    lv_obj_set_style_border_color(sw, lv_color_hex(C_EDGE_BTN), LV_PART_MAIN);
+    lv_obj_set_style_border_width(sw, PX, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(sw, lv_color_hex(C_LAV), LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_color(sw, lv_color_hex(C_CREAM), LV_PART_KNOB);
+    lv_obj_set_style_pad_all(sw, -PX, LV_PART_KNOB);
+}
+#endif
 
 static void go_back(void);
 
@@ -182,10 +332,19 @@ static lv_obj_t *back_button(lv_obj_t *p)
 {
     lv_obj_t *b = lv_button_create(p);
     lv_obj_remove_style_all(b);
+#if CONFIG_MUSE_PIXEL_THEME
+    /* As the pocket's close button, on the left. */
+    lv_obj_set_size(b, 56, 56);
+    lv_obj_set_pos(b, PAD, 16);
+    pixel_frame(b, C_TILE, C_EDGE_BTN, C_TILE_DOWN);
+    lv_obj_add_event_cb(b, on_back, LV_EVENT_CLICKED, NULL);
+    lv_obj_center(icon(b, LV_SYMBOL_LEFT, C_CREAM, C_TILE));
+    return b;
+#endif
     lv_obj_set_size(b, 56, 48);
     lv_obj_align(b, LV_ALIGN_TOP_MID, -112, 28);
     lv_obj_add_event_cb(b, on_back, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *arrow = label(b, &lv_font_montserrat_20, COLOR_ACCENT, LV_SYMBOL_LEFT);
+    lv_obj_t *arrow = label(b, FONT_ROW, COLOR_ACCENT, LV_SYMBOL_LEFT);
     lv_obj_center(arrow);
     return b;
 }
@@ -193,8 +352,49 @@ static lv_obj_t *back_button(lv_obj_t *p)
 /* A page: title, optional back arrow, and a vertically scrolling column. */
 static lv_obj_t *page(lv_obj_t *tile, const char *title, bool back, lv_obj_t **list_out)
 {
+#if CONFIG_MUSE_PIXEL_THEME
+    /* As the pocket: a cream title top left (after the back button), and the
+     * rows below in a column that scrolls with a chunky lavender bar. The
+     * dock's close button is at the top right. */
+    lv_obj_t *pp = lv_obj_create(tile);
+    lv_obj_remove_style_all(pp);
+    lv_obj_set_size(pp, lv_pct(100), lv_pct(100));
+    lv_obj_remove_flag(pp, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(pp, LV_OBJ_FLAG_HIDDEN);
+    catch_swipes(pp);
+    if (back) {
+        back_button(pp);
+    }
+    char buf[32];
+    int tx = back ? PAD + 56 + 18 : PAD;
+    lv_obj_t *tl = label(pp, FONT_TITLE, COLOR_TEXT, title_case(title, buf, sizeof(buf)));
+    lv_obj_set_width(tl, s_pw - tx - (PAD + 56 + 12));
+    lv_label_set_long_mode(tl, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_pos(tl, tx, 26);
+
+    lv_obj_t *pl = lv_obj_create(pp);
+    lv_obj_remove_style_all(pl);
+    lv_obj_set_pos(pl, PAD, LIST_TOP);
+    lv_obj_set_size(pl, s_pw - 2 * PAD + 18, s_ph - LIST_TOP - 12);
+    lv_obj_set_flex_flow(pl, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(pl, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(pl, 12, 0);
+    lv_obj_set_style_pad_right(pl, 18, 0);
+    lv_obj_set_style_pad_top(pl, PX, 0);      /* the first row's notches */
+    lv_obj_set_style_pad_bottom(pl, 16, 0);
+    lv_obj_set_scroll_dir(pl, LV_DIR_VER);
+    lv_obj_add_flag(pl, LV_OBJ_FLAG_SCROLL_MOMENTUM);
+    lv_obj_set_scrollbar_mode(pl, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_set_style_bg_color(pl, lv_color_hex(C_LAV), LV_PART_SCROLLBAR);
+    lv_obj_set_style_bg_opa(pl, LV_OPA_COVER, LV_PART_SCROLLBAR);
+    lv_obj_set_style_width(pl, 2 * PX, LV_PART_SCROLLBAR);
+    lv_obj_set_style_radius(pl, 0, LV_PART_SCROLLBAR);
+    lv_obj_set_style_pad_right(pl, 0, LV_PART_SCROLLBAR);
+    *list_out = pl;
+    return pp;
+#endif
     /* Flat short panels, and ones too narrow for LIST_W, get tighter rows. */
-    const bool compact = !muse_board->round && (muse_board->height <= 240 || muse_board->width < LIST_W);
+    const bool compact = !muse_board->round && (s_ph <= 240 || s_pw < LIST_W);
     const int list_top = compact ? (back ? 48 : 36) : LIST_TOP;
     lv_obj_t *p = lv_obj_create(tile);
     lv_obj_remove_style_all(p);
@@ -203,7 +403,7 @@ static lv_obj_t *page(lv_obj_t *tile, const char *title, bool back, lv_obj_t **l
     lv_obj_add_flag(p, LV_OBJ_FLAG_HIDDEN);
     catch_swipes(p);
 
-    lv_obj_t *t = label(p, compact ? &lv_font_montserrat_16 : &lv_font_unscii_16, COLOR_ACCENT, title);
+    lv_obj_t *t = label(p, compact ? FONT_SMALL : FONT_TITLE, COLOR_ACCENT, title);
     lv_obj_set_style_text_letter_space(t, compact ? 0 : 2, 0);
     lv_obj_align(t, LV_ALIGN_TOP_MID, 0, compact ? (back ? 12 : 8) : 44);
 
@@ -217,7 +417,7 @@ static lv_obj_t *page(lv_obj_t *tile, const char *title, bool back, lv_obj_t **l
 
     lv_obj_t *list = lv_obj_create(p);
     lv_obj_remove_style_all(list);
-    lv_obj_set_size(list, compact ? muse_board->width - 16 : LIST_W, muse_board->height - list_top);
+    lv_obj_set_size(list, compact ? s_pw - 16 : LIST_W, s_ph - list_top);
     lv_obj_align(list, LV_ALIGN_TOP_MID, 0, list_top);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(list, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -244,7 +444,22 @@ static lv_obj_t *card(lv_obj_t *list, bool clickable)
     lv_obj_set_flex_align(c, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(c, 12, 0);
     lv_obj_remove_flag(c, LV_OBJ_FLAG_SCROLLABLE);
+#if CONFIG_MUSE_PIXEL_THEME
+    lv_obj_set_style_pad_hor(c, 14, 0);
+    lv_obj_set_style_pad_column(c, 14, 0);
+    pixel_frame(c, COLOR_CARD, C_EDGE_BTN, COLOR_CARD_PRESSED);
+#endif
     return c;
+}
+
+/* A row's icon, in pixels with the pixel look. */
+static void row_icon(lv_obj_t *c, const char *symbol)
+{
+#if CONFIG_MUSE_PIXEL_THEME
+    icon(c, symbol, COLOR_ACCENT, COLOR_CARD);
+#else
+    label(c, FONT_ROW, COLOR_ACCENT, symbol);
+#endif
 }
 
 /* Tappable row: icon, text, right-aligned value. */
@@ -253,14 +468,18 @@ static lv_obj_t *row(lv_obj_t *list, const char *icon, const char *text, lv_obj_
 {
     lv_obj_t *c = card(list, true);
     if (icon) {
-        label(c, &lv_font_montserrat_20, COLOR_ACCENT, icon);
+        row_icon(c, icon);
     }
-    lv_obj_t *t = label(c, &lv_font_montserrat_20, COLOR_TEXT, text);
+    lv_obj_t *t = label(c, FONT_ROW, COLOR_TEXT, text);
     lv_obj_set_flex_grow(t, 1);
     lv_label_set_long_mode(t, LV_LABEL_LONG_MODE_DOTS);
     if (value_out) {
-        lv_obj_t *v = label(c, &lv_font_montserrat_16, COLOR_DIM, "");
+        lv_obj_t *v = label(c, FONT_SMALL, COLOR_DIM, "");
+#if CONFIG_MUSE_PIXEL_THEME
+        lv_obj_set_style_max_width(v, 220, 0);   /* a server's name on one line */
+#else
         lv_obj_set_style_max_width(v, 130, 0);
+#endif
         lv_label_set_long_mode(v, LV_LABEL_LONG_MODE_DOTS);
         *value_out = v;
     }
@@ -268,10 +487,13 @@ static lv_obj_t *row(lv_obj_t *list, const char *icon, const char *text, lv_obj_
     return c;
 }
 
-static lv_obj_t *switch_row(lv_obj_t *list, const char *text, bool on, lv_event_cb_t cb)
+static lv_obj_t *switch_row_icon(lv_obj_t *list, const char *icon, const char *text, bool on, lv_event_cb_t cb)
 {
     lv_obj_t *c = card(list, false);
-    lv_obj_t *t = label(c, &lv_font_montserrat_20, COLOR_TEXT, text);
+    if (icon) {
+        row_icon(c, icon);
+    }
+    lv_obj_t *t = label(c, FONT_ROW, COLOR_TEXT, text);
     lv_obj_set_flex_grow(t, 1);
     lv_obj_t *sw = lv_switch_create(c);
     lv_obj_set_size(sw, 60, 32);
@@ -280,15 +502,30 @@ static lv_obj_t *switch_row(lv_obj_t *list, const char *text, bool on, lv_event_
     if (on) {
         lv_obj_add_state(sw, LV_STATE_CHECKED);
     }
+#if CONFIG_MUSE_PIXEL_THEME
+    pixel_switch(sw);
+#endif
     lv_obj_add_event_cb(sw, cb, LV_EVENT_VALUE_CHANGED, NULL);
     return sw;
+}
+
+static lv_obj_t *switch_row(lv_obj_t *list, const char *text, bool on, lv_event_cb_t cb)
+{
+    return switch_row_icon(list, NULL, text, on, cb);
 }
 
 static lv_obj_t *button(lv_obj_t *list, const char *text, uint32_t color, lv_event_cb_t cb, lv_obj_t **label_out)
 {
     lv_obj_t *b = card(list, true);
     lv_obj_set_flex_align(b, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_t *l = label(b, &lv_font_montserrat_20, color, text);
+#if CONFIG_MUSE_PIXEL_THEME
+    if (color == COLOR_DANGER) {   /* as the pocket's power tile */
+        lv_obj_set_style_bg_color(b, lv_color_hex(C_RED_TILE), 0);
+        lv_obj_set_style_bg_color(b, lv_color_hex(C_RED_LO), LV_STATE_PRESSED);
+        lv_obj_set_style_border_color(b, lv_color_hex(C_RED_LO), 0);
+    }
+#endif
+    lv_obj_t *l = label(b, FONT_ROW, color, text);
     lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, NULL);
     if (label_out) {
         *label_out = l;
@@ -307,8 +544,8 @@ static lv_obj_t *slider(lv_obj_t *list, const char *text, int lo, int hi, int va
     lv_obj_set_style_pad_ver(c, 6, 0);
     lv_obj_remove_flag(c, LV_OBJ_FLAG_SCROLLABLE);
 
-    label(c, &lv_font_montserrat_20, COLOR_TEXT, text);
-    lv_obj_t *v = label(c, &lv_font_montserrat_20, COLOR_ACCENT, "");
+    label(c, FONT_ROW, COLOR_TEXT, text);
+    lv_obj_t *v = label(c, FONT_ROW, COLOR_ACCENT, "");
     lv_obj_align(v, LV_ALIGN_TOP_RIGHT, 0, 0);
     *value_out = v;
 
@@ -318,10 +555,22 @@ static lv_obj_t *slider(lv_obj_t *list, const char *text, int lo, int hi, int va
     lv_obj_align(s, LV_ALIGN_TOP_MID, 0, 40);
     lv_slider_set_range(s, lo, hi);
     lv_slider_set_value(s, value, LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(s, lv_color_hex(0x2a2345), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(s, lv_color_hex(COLOR_TRACK), LV_PART_MAIN);
     lv_obj_set_style_bg_color(s, lv_color_hex(COLOR_ACCENT), LV_PART_INDICATOR);
     lv_obj_set_style_bg_color(s, lv_color_hex(COLOR_TEXT), LV_PART_KNOB);
     lv_obj_set_style_pad_all(s, 6, LV_PART_KNOB);
+#if CONFIG_MUSE_PIXEL_THEME
+    /* Square: a night track with a lavender fill and a cream block of a knob. */
+    lv_obj_set_style_radius(s, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(s, 0, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(s, 0, LV_PART_KNOB);
+    lv_obj_set_style_bg_color(s, lv_color_hex(C_NIGHT), LV_PART_MAIN);   /* a track that shows on the panel */
+    lv_obj_set_style_border_color(s, lv_color_hex(C_EDGE_BTN), LV_PART_MAIN);
+    lv_obj_set_style_border_width(s, PX, LV_PART_MAIN);
+    lv_obj_set_height(s, 24);
+    lv_obj_set_style_border_color(s, lv_color_hex(C_INK), LV_PART_KNOB);
+    lv_obj_set_style_border_width(s, PX, LV_PART_KNOB);
+#endif
     lv_obj_set_ext_click_area(s, 16);
     lv_obj_add_event_cb(s, cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s, cb, LV_EVENT_RELEASED, NULL);
@@ -350,9 +599,9 @@ static lv_obj_t *info_row(lv_obj_t *list, const char *text)
 {
     lv_obj_t *c = card(list, false);
     lv_obj_set_height(c, 44);
-    lv_obj_t *t = label(c, &lv_font_montserrat_16, COLOR_TEXT, text);
+    lv_obj_t *t = label(c, FONT_SMALL, COLOR_TEXT, text);
     lv_obj_set_flex_grow(t, 1);
-    return label(c, &lv_font_montserrat_16, COLOR_ACCENT, "");
+    return label(c, FONT_SMALL, COLOR_ACCENT, "");
 }
 
 /* ---------- navigation ---------- */
@@ -423,7 +672,7 @@ static int text_px(int v)
 
 static int text_y(int y)
 {
-    return muse_board->height / 2 + text_px(y - 233);
+    return s_ph / 2 + text_px(y - 233);
 }
 
 static void close_text(void)
@@ -432,9 +681,8 @@ static void close_text(void)
     show(s_text_back);
 }
 
-static void on_text_ready(lv_event_t *e)
+static void text_accept(void)
 {
-    (void)e;
     text_done_cb_t done = s_text_done;
     char *text = strdup(lv_textarea_get_text(s_text_ta));
     close_text();
@@ -447,10 +695,64 @@ static void on_text_ready(lv_event_t *e)
     }
 }
 
+static void on_text_ready(lv_event_t *e)
+{
+    (void)e;
+    text_accept();
+}
+
 static void on_text_cancel(lv_event_t *e)
 {
     (void)e;
     close_text();
+}
+
+static bool keyboard_attached(void)
+{
+    return muse_board->keyboard_present && muse_board->keyboard_present();
+}
+
+/* A tap on the field brings the on-screen keyboard back, even with a keyboard
+ * attached: typing on either then goes into the field. */
+static void on_text_field_clicked(lv_event_t *e)
+{
+    (void)e;
+    if (s_text_kb) {
+        lv_obj_remove_flag(s_text_kb, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+bool muse_settings_ui_key(uint32_t key)
+{
+    if (!s_text || s_current != s_text) {
+        return false;
+    }
+    switch (key) {
+    case LV_KEY_ENTER:
+        text_accept();
+        break;
+    case LV_KEY_ESC:
+        close_text();
+        break;
+    case LV_KEY_BACKSPACE:
+        lv_textarea_delete_char(s_text_ta);
+        break;
+    case LV_KEY_DEL:
+        lv_textarea_delete_char_forward(s_text_ta);
+        break;
+    case LV_KEY_LEFT:
+        lv_textarea_cursor_left(s_text_ta);
+        break;
+    case LV_KEY_RIGHT:
+        lv_textarea_cursor_right(s_text_ta);
+        break;
+    default:
+        if (key >= 0x20) {
+            lv_textarea_add_char(s_text_ta, key);   /* the field's max length still applies */
+        }
+        break;
+    }
+    return true;
 }
 
 static void on_text_show(lv_event_t *e)
@@ -458,9 +760,103 @@ static void on_text_show(lv_event_t *e)
     (void)e;
     bool pw = !lv_textarea_get_password_mode(s_text_ta);
     lv_textarea_set_password_mode(s_text_ta, pw);
-    lv_label_set_text(lv_obj_get_child(s_text_show, 0), pw ? "Show" : "Hide");
+    lv_label_set_text(lv_obj_get_child(s_text_show, -1), pw ? "Show" : "Hide");
 }
 
+#if CONFIG_MUSE_PIXEL_THEME
+#define FIELD_H 56
+#define SHOW_W 96
+
+/* Beside the field, a button to show a password. */
+static void fit_show_button(bool password)
+{
+    int w = s_pw - 2 * PAD;
+    lv_obj_set_width(lv_obj_get_parent(s_text_ta), password ? w - SHOW_W - 12 : w);
+    lv_label_set_text(lv_obj_get_child(s_text_show, -1), "Show");
+    lv_obj_set_flag(s_text_show, LV_OBJ_FLAG_HIDDEN, !password);
+}
+
+/* As the dock's chat: a night field with a lavender bar of a cursor, and its
+ * keyboard below. */
+static void build_text_page(lv_obj_t *tile)
+{
+    s_text = lv_obj_create(tile);
+    lv_obj_remove_style_all(s_text);
+    lv_obj_set_size(s_text, lv_pct(100), lv_pct(100));
+    lv_obj_remove_flag(s_text, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(s_text, LV_OBJ_FLAG_HIDDEN);
+    catch_swipes(s_text);
+    back_button(s_text);
+
+    int tx = PAD + 56 + 18;
+    s_text_title = label(s_text, FONT_TITLE, COLOR_TEXT, "");
+    lv_obj_set_width(s_text_title, s_pw - tx - (PAD + 56 + 12));
+    lv_label_set_long_mode(s_text_title, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_pos(s_text_title, tx, 26);
+
+    lv_obj_t *field = lv_obj_create(s_text);
+    lv_obj_remove_style_all(field);
+    lv_obj_remove_flag(field, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_pos(field, PAD, LIST_TOP);
+    lv_obj_set_size(field, s_pw - 2 * PAD, FIELD_H);
+    pixel_frame(field, C_NIGHT, C_EDGE_BTN, C_NIGHT);
+
+    s_text_ta = lv_textarea_create(field);
+    lv_textarea_set_one_line(s_text_ta, true);
+    lv_obj_set_size(s_text_ta, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_text_font(s_text_ta, FONT_ROW, 0);
+    lv_obj_set_style_text_color(s_text_ta, lv_color_hex(C_CREAM), 0);
+    lv_obj_set_style_text_font(s_text_ta, FONT_ROW, LV_PART_TEXTAREA_PLACEHOLDER);
+    lv_obj_set_style_text_color(s_text_ta, lv_color_hex(C_FAINT), LV_PART_TEXTAREA_PLACEHOLDER);
+    lv_obj_set_style_bg_opa(s_text_ta, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(s_text_ta, 0, 0);
+    lv_obj_set_style_border_width(s_text_ta, 0, LV_STATE_FOCUSED);
+    lv_obj_set_style_outline_width(s_text_ta, 0, LV_STATE_FOCUSED);
+    lv_obj_set_style_radius(s_text_ta, 0, 0);
+    lv_obj_set_style_pad_hor(s_text_ta, 12, 0);
+    int pad = (FIELD_H - 2 * PX - lv_font_get_line_height(FONT_ROW)) / 2;
+    lv_obj_set_style_pad_ver(s_text_ta, pad > 0 ? pad : 0, 0);
+    lv_obj_set_style_bg_opa(s_text_ta, LV_OPA_TRANSP, LV_PART_CURSOR);
+    lv_obj_set_style_border_color(s_text_ta, lv_color_hex(C_LAV), LV_PART_CURSOR);
+    lv_obj_set_style_border_width(s_text_ta, 3, LV_PART_CURSOR);
+    lv_obj_set_style_border_side(s_text_ta, LV_BORDER_SIDE_LEFT, LV_PART_CURSOR);
+    lv_obj_add_state(s_text_ta, LV_STATE_FOCUSED);
+    lv_obj_add_event_cb(s_text_ta, on_text_field_clicked, LV_EVENT_CLICKED, NULL);
+
+    s_text_show = lv_button_create(s_text);
+    lv_obj_remove_style_all(s_text_show);
+    lv_obj_set_size(s_text_show, SHOW_W, FIELD_H);
+    lv_obj_set_pos(s_text_show, s_pw - PAD - SHOW_W, LIST_TOP);
+    pixel_frame(s_text_show, C_TILE, C_EDGE_BTN, C_TILE_DOWN);
+    lv_obj_add_event_cb(s_text_show, on_text_show, LV_EVENT_CLICKED, NULL);
+    lv_obj_center(label(s_text_show, FONT_ROW, COLOR_TEXT, "Show"));
+
+    /* The dock's keyboard look: night keys, lavender when pressed. */
+    int y = LIST_TOP + FIELD_H + 20;
+    s_text_kb = lv_keyboard_create(s_text);
+    lv_obj_align(s_text_kb, LV_ALIGN_TOP_LEFT, PAD, y);
+    lv_obj_set_size(s_text_kb, s_pw - 2 * PAD, LV_MIN(s_ph - y - PAD, 300));
+    lv_obj_set_style_radius(s_text_kb, 0, 0);
+    lv_obj_set_style_bg_color(s_text_kb, lv_color_hex(C_PANEL), 0);
+    lv_obj_set_style_border_color(s_text_kb, lv_color_hex(C_EDGE_BTN), 0);
+    lv_obj_set_style_border_width(s_text_kb, PX, 0);
+    lv_obj_set_style_pad_all(s_text_kb, 6, 0);
+    lv_obj_set_style_pad_gap(s_text_kb, 6, 0);
+    lv_obj_set_style_radius(s_text_kb, 0, LV_PART_ITEMS);
+    lv_obj_set_style_border_width(s_text_kb, 0, LV_PART_ITEMS);
+    lv_obj_set_style_shadow_width(s_text_kb, 0, LV_PART_ITEMS);
+    lv_obj_set_style_text_font(s_text_kb, FONT_ROW, LV_PART_ITEMS);
+    lv_obj_set_style_bg_color(s_text_kb, lv_color_hex(C_TILE), LV_PART_ITEMS);
+    lv_obj_set_style_text_color(s_text_kb, lv_color_hex(C_CREAM), LV_PART_ITEMS);
+    lv_obj_set_style_bg_color(s_text_kb, lv_color_hex(C_LAV), LV_PART_ITEMS | LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(s_text_kb, lv_color_hex(C_EDGE_BTN), LV_PART_ITEMS | LV_STATE_CHECKED);
+    lv_obj_set_style_text_color(s_text_kb, lv_color_hex(C_LAV_SOFT), LV_PART_ITEMS | LV_STATE_CHECKED);
+    lv_obj_remove_flag(s_text_kb, LV_OBJ_FLAG_GESTURE_BUBBLE);   /* a sloppy swipe mustn't lose the text */
+    lv_keyboard_set_textarea(s_text_kb, s_text_ta);
+    lv_obj_add_event_cb(s_text_kb, on_text_ready, LV_EVENT_READY, NULL);
+    lv_obj_add_event_cb(s_text_kb, on_text_cancel, LV_EVENT_CANCEL, NULL);
+}
+#else
 /* Beside the keyboard's field, a button to show a password. */
 static void fit_show_button(bool password)
 {
@@ -468,7 +864,7 @@ static void fit_show_button(bool password)
     lv_obj_set_width(s_text_ta, password ? w - show_w - gap : w);
     lv_obj_align(s_text_ta, LV_ALIGN_TOP_MID, password ? -(show_w + gap) / 2 : 0, text_y(76));
     lv_obj_align(s_text_show, LV_ALIGN_TOP_MID, (w - show_w) / 2, text_y(76));
-    lv_label_set_text(lv_obj_get_child(s_text_show, 0), "Show");
+    lv_label_set_text(lv_obj_get_child(s_text_show, -1), "Show");
     if (password) {
         lv_obj_remove_flag(s_text_show, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -485,7 +881,7 @@ static void build_keyboard(void)
     lv_obj_set_style_bg_opa(s_text_show, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(s_text_show, lv_color_hex(COLOR_CARD), 0);
     lv_obj_add_event_cb(s_text_show, on_text_show, LV_EVENT_CLICKED, NULL);
-    lv_obj_center(label(s_text_show, &lv_font_montserrat_16, COLOR_TEXT, "Show"));
+    lv_obj_center(label(s_text_show, FONT_SMALL, COLOR_TEXT, "Show"));
 
     /* Inside the circle, or across the rest of the screen. */
     s_text_kb = lv_keyboard_create(s_text);
@@ -493,15 +889,15 @@ static void build_keyboard(void)
     if (muse_board->round) {
         lv_obj_set_size(s_text_kb, text_px(384), text_px(206));
     } else {
-        int w = muse_board->width - 16;
-        int h = muse_board->height - y - 8;
+        int w = s_pw - 16;
+        int h = s_ph - y - 8;
         lv_obj_set_size(s_text_kb, w, LV_MIN(h, w * 206 / 384));
     }
     lv_obj_align(s_text_kb, LV_ALIGN_TOP_MID, 0, y);
     lv_obj_set_style_bg_opa(s_text_kb, LV_OPA_TRANSP, 0);
     lv_obj_set_style_pad_all(s_text_kb, 2, 0);
     lv_obj_set_style_pad_gap(s_text_kb, 4, 0);
-    lv_obj_set_style_text_font(s_text_kb, &lv_font_montserrat_20, LV_PART_ITEMS);
+    lv_obj_set_style_text_font(s_text_kb, FONT_ROW, LV_PART_ITEMS);
     lv_obj_set_style_bg_color(s_text_kb, lv_color_hex(COLOR_CARD), LV_PART_ITEMS);
     lv_obj_set_style_text_color(s_text_kb, lv_color_hex(COLOR_TEXT), LV_PART_ITEMS);
     lv_obj_set_style_radius(s_text_kb, 8, LV_PART_ITEMS);
@@ -523,13 +919,13 @@ static void build_text_page(lv_obj_t *tile)
     lv_obj_t *back = back_button(s_text);
 
     /* Between the back arrow and its mirror image. */
-    s_text_title = label(s_text, &lv_font_montserrat_20, COLOR_ACCENT, "");
+    s_text_title = label(s_text, FONT_ROW, COLOR_ACCENT, "");
     lv_obj_set_width(s_text_title, 150);
     lv_obj_set_style_text_align(s_text_title, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(s_text_title, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_align(s_text_title, LV_ALIGN_TOP_MID, 0, 40);
 
-    const lv_font_t *font = &lv_font_montserrat_20;
+    const lv_font_t *font = FONT_ROW;
     int h = text_px(48), border = 2;
     int pad = (h - 2 * border - lv_font_get_line_height(font)) / 2;
     s_text_ta = lv_textarea_create(s_text);
@@ -543,9 +939,10 @@ static void build_text_page(lv_obj_t *tile)
     lv_obj_set_style_border_color(s_text_ta, lv_color_hex(COLOR_ACCENT), 0);
     lv_obj_set_style_border_width(s_text_ta, border, 0);
     lv_obj_set_style_radius(s_text_ta, 14, 0);
-    lv_obj_set_style_text_font(s_text_ta, &lv_font_montserrat_16, LV_PART_TEXTAREA_PLACEHOLDER);
+    lv_obj_set_style_text_font(s_text_ta, FONT_SMALL, LV_PART_TEXTAREA_PLACEHOLDER);
     lv_obj_set_style_text_color(s_text_ta, lv_color_hex(COLOR_DIM), LV_PART_TEXTAREA_PLACEHOLDER);
     lv_obj_add_state(s_text_ta, LV_STATE_FOCUSED);
+    lv_obj_add_event_cb(s_text_ta, on_text_field_clicked, LV_EVENT_CLICKED, NULL);
     lv_obj_align(s_text_ta, LV_ALIGN_TOP_MID, 0, text_y(76));
 
     /* A full keyboard's keys are too small to hit on a screen under 2". */
@@ -564,7 +961,7 @@ static void build_text_page(lv_obj_t *tile)
     lv_obj_align(back, LV_ALIGN_TOP_MID, -text_px(140), text_y(44));
     s_text_kp = muse_keypad_create(s_text, s_text_ta, muse_board->round);
     int top = text_y(98);
-    lv_obj_set_size(s_text_kp, muse_board->width, muse_board->height - top);
+    lv_obj_set_size(s_text_kp, s_pw, s_ph - top);
     lv_obj_align(s_text_kp, LV_ALIGN_TOP_MID, 0, top);
     if (muse_board->round) {
         /* Lifts the bottom row's labels inside the circle. The button matrix
@@ -575,6 +972,8 @@ static void build_text_page(lv_obj_t *tile)
     lv_obj_add_event_cb(s_text_kp, on_text_ready, LV_EVENT_READY, NULL);
 }
 
+#endif
+
 /* The hint shows in the empty field, so keep it short. */
 static void open_text(const char *title, const char *initial, bool password, int max_len, const char *hint,
                       text_done_cb_t done, lv_obj_t *back)
@@ -582,6 +981,10 @@ static void open_text(const char *title, const char *initial, bool password, int
     if (!s_text) {
         build_text_page(s_tile);
     }
+#if CONFIG_MUSE_PIXEL_THEME
+    char lower[32];
+    title = title_case(title, lower, sizeof(lower));
+#endif
     set_text(s_text_title, title);
     lv_textarea_set_max_length(s_text_ta, max_len);
     lv_textarea_set_password_mode(s_text_ta, password);
@@ -592,6 +995,12 @@ static void open_text(const char *title, const char *initial, bool password, int
     } else {
         lv_keyboard_set_mode(s_text_kb, LV_KEYBOARD_MODE_TEXT_LOWER);
         fit_show_button(password);
+        /* With a keyboard attached, type on it; a tap on the field opens this one. */
+        if (keyboard_attached()) {
+            lv_obj_add_flag(s_text_kb, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_remove_flag(s_text_kb, LV_OBJ_FLAG_HIDDEN);
+        }
     }
     s_text_done = done;
     s_text_back = back;
@@ -1029,15 +1438,19 @@ static void build_sound_page(lv_obj_t *tile)
     lv_obj_set_size(meter, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_set_style_pad_hor(meter, 8, 0);
     lv_obj_remove_flag(meter, LV_OBJ_FLAG_SCROLLABLE);
-    label(meter, &lv_font_montserrat_16, COLOR_DIM, "Mic level");
-    s_mic_val = label(meter, &lv_font_montserrat_16, COLOR_DIM, "");
+    label(meter, FONT_SMALL, COLOR_DIM, "Mic level");
+    s_mic_val = label(meter, FONT_SMALL, COLOR_DIM, "");
     lv_obj_align(s_mic_val, LV_ALIGN_TOP_RIGHT, 0, 0);
     s_mic_bar = lv_bar_create(meter);
     lv_obj_set_size(s_mic_bar, lv_pct(94), 10);
     lv_obj_align(s_mic_bar, LV_ALIGN_TOP_MID, 0, 26);
     lv_bar_set_range(s_mic_bar, 0, 60);   /* -70..-10 dBFS */
-    lv_obj_set_style_bg_color(s_mic_bar, lv_color_hex(0x2a2345), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(s_mic_bar, lv_color_hex(COLOR_TRACK), LV_PART_MAIN);
     lv_obj_set_style_anim_duration(s_mic_bar, 80, 0);
+#if CONFIG_MUSE_PIXEL_THEME
+    lv_obj_set_style_radius(s_mic_bar, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(s_mic_bar, 0, LV_PART_INDICATOR);
+#endif
     note(list, "Talk at arm's length: the bar should reach green (-30 to -15 dBFS) without going orange.");
 
     s_bright_sl = slider(list, "Brightness", 10, 100, muse_settings_brightness(), &s_bright_val, on_bright);
@@ -1052,6 +1465,11 @@ static void tick_sound(void)
     bool on = muse_settings_speaker_on();   /* also toggled from the face */
     if (on != lv_obj_has_state(s_spk_sw, LV_STATE_CHECKED)) {
         lv_obj_set_state(s_spk_sw, LV_STATE_CHECKED, on);
+    }
+    int vol = muse_settings_volume();   /* also dragged on the face, set from the Tab5 dock or the phone */
+    if (vol != lv_slider_get_value(s_vol_sl) && !lv_obj_has_state(s_vol_sl, LV_STATE_PRESSED)) {
+        lv_slider_set_value(s_vol_sl, vol, LV_ANIM_OFF);
+        set_val(s_vol_val, "%d%%", vol);
     }
     float db = muse_voice_monitor_db();
     int v = (int)(db + 70.0f);
@@ -1229,8 +1647,13 @@ static void build_power_page(lv_obj_t *tile)
     button(list, LV_SYMBOL_POWER "  Power off", COLOR_DANGER, on_power_off, NULL);
     button(list, "Cancel", COLOR_TEXT, on_back, NULL);
     char text[128];
-    snprintf(text, sizeof(text), "Press the %s button to turn it back on. To just turn the screen off, press the %s button.",
-             muse_board->talk_button, muse_board->aux_button);
+    if (muse_board->aux_button) {
+        snprintf(text, sizeof(text),
+                 "Press the %s button to turn it back on. To just turn the screen off, press the %s button.",
+                 muse_board->talk_button, muse_board->aux_button);
+    } else {   /* no screen-off button (the Tab5: "nap" in the pocket) */
+        snprintf(text, sizeof(text), "Press the %s button to turn it back on.", muse_board->talk_button);
+    }
     note(list, text);
 }
 
@@ -1244,12 +1667,20 @@ static const page_t SLEEP = { &s_sleep, build_sleep_page };
 static const page_t BATTERY = { &s_battery, build_battery_page };
 static const page_t POWER = { &s_power, build_power_page };
 
+/* Off (the default): only replies to the talk button are played, and the
+ * connection may close when idle, which saves battery. (wupsbr/waveshare-muse-gadget-sdk) */
+static void on_pushes_sw(lv_event_t *e)
+{
+    muse_settings_set_pushes_on(lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED));
+}
+
 static void build_home(lv_obj_t *tile)
 {
     lv_obj_t *list;
     s_home = page(tile, "SETTINGS", false, &list);
     row(list, LV_SYMBOL_WIFI, "Wi-Fi", &s_home_wifi, on_nav, (void *)&WIFI);
     row(list, LV_SYMBOL_HOME, "Muse", &s_home_hatch, on_nav, (void *)&HATCH);
+    s_home_pushes = switch_row_icon(list, LV_SYMBOL_BELL, "All messages", muse_settings_pushes_on(), on_pushes_sw);
     row(list, LV_SYMBOL_BLUETOOTH, "Bluetooth", &s_home_ble, on_nav, (void *)&BLE);
     row(list, LV_SYMBOL_VOLUME_MAX, "Sound", &s_home_sound, on_nav, (void *)&SOUND);
     row(list, LV_SYMBOL_EYE_CLOSE, "Sleep", &s_home_sleep, on_nav, (void *)&SLEEP);
@@ -1279,6 +1710,10 @@ static void tick_home(void)
         set_text(s_home_sound, "Muted");
     }
     set_text(s_home_sleep, sleep_name(muse_settings_sleep_s()));
+    bool pushes = muse_settings_pushes_on();
+    if (pushes != lv_obj_has_state(s_home_pushes, LV_STATE_CHECKED)) {
+        lv_obj_set_state(s_home_pushes, LV_STATE_CHECKED, pushes);
+    }
 
     muse_power_t p = muse_state_power();
     char buf[96];
@@ -1298,8 +1733,21 @@ static void tick_home(void)
 
 void muse_settings_ui_build(lv_obj_t *tile)
 {
-    if (muse_board->round && muse_board->height < 466) {
-        s_text_scale = muse_board->height;
+    lv_obj_update_layout(tile);
+    s_pw = lv_obj_get_content_width(tile);
+    s_ph = lv_obj_get_content_height(tile);
+    if (s_pw <= 0 || s_ph <= 0) {
+        s_pw = muse_board->width;
+        s_ph = muse_board->height;
+    }
+#if CONFIG_MUSE_PIXEL_THEME
+    s_font_row = *F_BODY;
+    s_font_row.fallback = &lv_font_montserrat_20;
+    s_font_small = *F_LABEL;
+    s_font_small.fallback = &lv_font_montserrat_16;
+#endif
+    if (muse_board->round && s_ph < 466) {
+        s_text_scale = s_ph;
     }
     s_tile = tile;
     build_home(tile);
@@ -1309,6 +1757,11 @@ void muse_settings_ui_build(lv_obj_t *tile)
 void muse_settings_ui_tick(bool visible)
 {
     static bool was_visible;
+    /* The keyboard unplugged while the text page waits: the on-screen one is back. */
+    if (s_text && s_current == s_text && s_text_kb && lv_obj_has_flag(s_text_kb, LV_OBJ_FLAG_HIDDEN)
+        && !keyboard_attached()) {
+        lv_obj_remove_flag(s_text_kb, LV_OBJ_FLAG_HIDDEN);
+    }
     if (visible != was_visible) {
         was_visible = visible;
         /* Only listen to the mic while the Sound page is actually on screen. */
@@ -1332,6 +1785,51 @@ void muse_settings_ui_tick(bool visible)
     } else if (s_current == s_battery) {
         tick_battery();
     }
+}
+
+void muse_settings_ui_home(void)
+{
+    if (s_current == s_text) {
+        close_text();   /* clears the field */
+    }
+    if (s_home) {
+        show(s_home);
+    }
+}
+
+bool muse_settings_ui_open(const char *name)
+{
+    static const struct {
+        const char *name;
+        const page_t *page;
+    } PAGES[] = { { "wifi", &WIFI }, { "muse", &HATCH }, { "ble", &BLE }, { "sound", &SOUND },
+                  { "sleep", &SLEEP }, { "battery", &BATTERY }, { "power", &POWER } };
+    if (!s_home) {
+        return false;
+    }
+    muse_settings_ui_home();
+    if (!strcmp(name, "home")) {
+        return true;
+    }
+    if (!strcmp(name, "text")) {   /* the keyboard page, as "Other network..." opens it */
+        if (!s_wifi) {
+            build_wifi_page(s_tile);
+        }
+        show(s_wifi);
+        open_text("Other network", "", false, MUSE_SSID_MAX, "Network name", on_other_ssid, s_wifi);
+        return true;
+    }
+    for (size_t i = 0; i < sizeof(PAGES) / sizeof(PAGES[0]); i++) {
+        if (!strcmp(name, PAGES[i].name)) {
+            if (!*PAGES[i].page->obj) {
+                PAGES[i].page->build(s_tile);
+            }
+            show(*PAGES[i].page->obj);
+            muse_settings_ui_tick(true);
+            return true;
+        }
+    }
+    return false;
 }
 
 bool muse_settings_ui_in_subpage(void)

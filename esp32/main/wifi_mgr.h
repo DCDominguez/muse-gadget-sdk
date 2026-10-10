@@ -62,6 +62,10 @@ bool wifi_mgr_joining(char *ssid, size_t cap);
 int wifi_mgr_scan(wifi_scan_entry_t *out, int max_entries, uint8_t channel,
                   const char *target_ssid);
 
+// The same, listening for beacons instead of probing (">scan" on the Muse
+// console): hears an access point that doesn't answer this station's probes.
+int wifi_mgr_scan_passive(wifi_scan_entry_t *out, int max_entries, uint8_t channel);
+
 // Run a scan and store the results in the internal cache. Returns count.
 int wifi_mgr_scan_and_cache(void);
 
@@ -77,3 +81,8 @@ int wifi_mgr_get_cached_scan(wifi_scan_entry_t *out, int max_entries);
 
 // Whether the cached scan has this network, broadcasting its name.
 bool wifi_mgr_cached_scan_has(const char *ssid);
+
+// ">wifi" on the Muse console: connection state and the last few drops from a
+// working connection (uptime, wifi_err_reason_t, RSSI, time to the next IP or
+// -1 while down), as JSON. Returns snprintf's count.
+int wifi_mgr_drops_json(char *out, size_t cap);

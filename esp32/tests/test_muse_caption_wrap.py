@@ -78,6 +78,41 @@ class CaptionWrapTest(unittest.TestCase):
         )
         return proc.stdout.decode().split("\n")
 
+    def dock(self, text: str) -> str:
+        proc = subprocess.run(
+            [str(self.binary), "keep"],
+            input=text.encode(),
+            capture_output=True,
+            check=True,
+        )
+        return proc.stdout.decode()
+
+    def test_dock_keeps_the_emoji_its_font_has(self) -> None:
+        # Kept: an emoticon. Stand-ins: curly quotes. Gone: the variation
+        # selector, a skin tone, a joiner and emoji the font lacks.
+        text = "Hi \U0001F600️ “ok” \U0001F44D\U0001F3FD a‍b \U0001F680!"
+        self.assertEqual(self.dock(text), 'Hi \U0001F600 "ok"  ab !')
+
+    def overlap(self, shown: str, nxt: str) -> int:
+        proc = subprocess.run(
+            [str(self.binary), "overlap"],
+            input=(shown + "\n" + nxt).encode(),
+            capture_output=True,
+            check=True,
+        )
+        return int(proc.stdout)
+
+    def test_dock_adds_only_the_new_part_of_a_caption(self) -> None:
+        # A caption that grew, one that slid along the reply, a new page, and a
+        # page that only shares a short word with the end: none doubles text.
+        shown = "the command reached the tab five, but the capture"
+        self.assertEqual(self.overlap(shown, "the tab five, but the capture fails"), len("the tab five, but the capture"))
+        self.assertEqual(self.overlap(shown, "but the capture fails on the device"), len("but the capture"))
+        self.assertEqual(self.overlap(shown, "So the link is fine."), 0)
+        # Short overlaps count only as whole words: the "band: band:" seen on the Tab5.
+        self.assertEqual(self.overlap("already forming a band:", "band: drums and bass"), len("band:"))
+        self.assertEqual(self.overlap("the guitarist", "list of songs"), 0)
+
     def test_words_stay_whole(self) -> None:
         self.assertEqual(self.wrap("the quick brown fox jumps", 10), ["the quick", "brown fox", "jumps"])
 

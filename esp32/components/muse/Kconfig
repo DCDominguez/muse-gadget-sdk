@@ -84,6 +84,10 @@ menu "Muse"
         config MUSE_BOARD_WAVESHARE_S3_LCD7
             bool "Waveshare ESP32-S3-Touch-LCD-7 (800x480 touch LCD, no audio)"
             depends on IDF_TARGET_ESP32S3
+
+        config MUSE_BOARD_M5STACK_TAB5
+            bool "M5Stack Tab5 (ESP32-P4, 5\" 1280x720 touch LCD, Wi-Fi and BLE on an ESP32-C6)"
+            depends on IDF_TARGET_ESP32P4
     endchoice
 
     config MUSE_ENABLED
@@ -109,6 +113,7 @@ menu "Muse"
         default "fnk0104b" if MUSE_BOARD_FNK0104B
         default "guition_jc3248w535" if MUSE_BOARD_GUITION_JC3248W535
         default "waveshare_s3_lcd7" if MUSE_BOARD_WAVESHARE_S3_LCD7
+        default "m5stack_tab5" if MUSE_BOARD_M5STACK_TAB5
         default "none"
 
     # The Muse tools' serial port: the console UART behind the board's USB
@@ -124,6 +129,60 @@ menu "Muse"
         range 0 100
         default 70
 
+    config MUSE_ELEVENLABS_API_KEY
+        string "ElevenLabs API key for spoken replies"
+        depends on MUSE_HATCH
+        default ""
+        help
+            With a key, start_tts sends each reply's text to ElevenLabs'
+            streaming text-to-speech and plays the MP3 it returns, captions
+            following the speech. The key needs the Text to Speech
+            permission. Empty: replies stay text. Like the SDK token, the key
+            ships inside the firmware: never commit a generated sdkconfig.
+
+    config MUSE_ELEVENLABS_VOICE_ID
+        string "ElevenLabs voice ID"
+        depends on MUSE_HATCH
+        default "EXAVITQu4vr4xnSDxMaL"
+        help
+            Any voice in the account's library. The default is the premade
+            "Sarah".
+
+    config MUSE_ELEVENLABS_MODEL
+        string "ElevenLabs model"
+        depends on MUSE_HATCH
+        default "eleven_flash_v2_5"
+        help
+            eleven_flash_v2_5 answers fastest and speaks 32 languages;
+            eleven_multilingual_v2 sounds richer but starts later.
+
+    config MUSE_TTS_VOICE
+        string "Speech server voice"
+        depends on MUSE_HATCH
+        default "af_heart"
+        help
+            The voice asked of a speech server on the home network, set at run
+            time with the console command ">tts=URL" (for example Kokoro-FastAPI
+            at http://192.168.1.20:8880). A server set there is used before
+            ElevenLabs, and needs no key. ">tts.voice=NAME" changes the voice.
+            af_heart is one of Kokoro's English voices.
+
+    config MUSE_TTS_MODEL
+        string "Speech server model"
+        depends on MUSE_HATCH
+        default "kokoro"
+        help
+            The "model" field of the request to the speech server.
+
+    config MUSE_TAB5_ROTATE_270
+        bool "M5Stack Tab5: landscape the other way up"
+        depends on MUSE_BOARD_M5STACK_TAB5
+        default n
+        help
+            The Tab5 runs its portrait panel landscape, turned 90 degrees.
+            Turn this on for 270 degrees instead. The Flip button beside
+            Muse swaps it at run time and remembers the choice.
+
     config MUSE_WATCHER_CAMERA
         bool "SenseCAP Watcher camera capture and live preview"
         depends on MUSE_BOARD_SENSECAP_WATCHER && SPIRAM
@@ -133,6 +192,28 @@ menu "Muse"
             double-click camera preview. Camera buffers and tasks consume
             memory and preview decoding shares CPU time with voice and Link.
             Leave disabled to build without camera support.
+
+    config MUSE_TAB5_CAMERA
+        bool "M5Stack Tab5: camera.capture"
+        depends on MUSE_BOARD_M5STACK_TAB5 && CAMERA_SC202CS
+        default y
+        help
+            Answer the camera.capture Home Link command with a 640x352 JPEG
+            from the Tab5's SC202CS camera (needs CONFIG_CAMERA_SC202CS, set
+            in the Tab5 overlay). The camera starts on the first capture.
+
+    config MUSE_TAB5_CAMERA_ROTATION
+        int "M5Stack Tab5: camera rotation, degrees counter-clockwise"
+        depends on MUSE_TAB5_CAMERA
+        default 0
+        help
+            Turns each frame upright for the Tab5 held landscape (0, 90, 180
+            or 270); Flip adds 180. 0 is upright on a Tab5 v1.3 with the
+            keyboard below the screen (checked on hardware).
+
+    config MUSE_CAMERA_CAPTURE
+        bool
+        default y if MUSE_WATCHER_CAMERA || MUSE_TAB5_CAMERA
 
     config MUSE_CJK_FONT
         bool "Show Chinese and Japanese in captions"
@@ -146,6 +227,42 @@ menu "Muse"
             one 16 px line at a time. Takes about 850 KB of flash and no RAM.
             Without it those characters show as boxes. Hangul isn't
             included.
+
+    config MUSE_PIXEL_THEME
+        bool "Pixel look for the dock around Muse"
+        depends on MUSE_ENABLED
+        default y if MUSE_BOARD_M5STACK_TAB5
+        default n
+        help
+            Large screens with a dock (the Tab5) draw it in Muse's own
+            pixel-art style: night-sky colours, notched pixel borders and
+            pixel fonts (Pixelify Sans for chat and titles, Silkscreen for
+            labels, both under the SIL Open Font License). Takes about
+            120 KB of flash. Without it the dock uses LVGL's Montserrat.
+
+    config MUSE_CLOCK_TZ
+        string "Time zone for the dock's clock (POSIX TZ)"
+        depends on MUSE_PIXEL_THEME
+        default "UTC0"
+        help
+            The dock's status strip shows the time once it's set over the
+            network (SNTP, from pool.ntp.org). A POSIX TZ string: "UTC0",
+            "JST-9" for Japan (UTC+9), "PST8PDT,M3.2.0,M11.1.0"
+            for US Pacific. Empty hides the clock.
+
+    config MUSE_EMOJI_FONT
+        bool "Show emoji in the dock's chat"
+        depends on MUSE_ENABLED
+        default y if MUSE_BOARD_M5STACK_TAB5
+        default n
+        help
+            The chat beside Muse on large screens (the Tab5's dock) falls
+            back to Google's monochrome Noto Emoji at 16 px for the
+            emoticons block and about 125 other common emoji, and offers a
+            picker of them next to Send. Single-codepoint emoji only:
+            variation selectors and skin tones are dropped, and a ZWJ
+            sequence shows as its parts. Takes about 30 KB of flash and no
+            RAM. Without it emoji show as boxes.
 
     config MUSE_JC3248W535_MIC_GPIO
         int "JC3248W535: GPIO for an external I2S mic's data (SD) line"

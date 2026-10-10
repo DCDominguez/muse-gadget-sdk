@@ -18,6 +18,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,6 +53,16 @@ bool muse_text_has_cjk(const char *s);
 /* Puts the stand-ins into s, which has room for cap bytes. If one doesn't fit,
  * the text ends there. */
 void muse_text_to_ascii(char *s, size_t cap);
+
+/* The same, but leaves alone each character keep() says the screen can draw
+ * (a fallback font's glyphs, such as the dock's emoji). */
+void muse_text_to_ascii_keeping(char *s, size_t cap, bool (*keep)(uint32_t cp));
+
+/* How much of next's start repeats the end of text: a caption that grew, or
+ * slid along a streaming reply, starts with what was already shown. An
+ * overlap under min bytes counts only as whole words, so only what's new is
+ * added. */
+size_t muse_text_overlap(const char *text, const char *next, size_t min);
 
 /* text, or if it needs stand-ins and fits in cap bytes, a copy with them in buf. */
 const char *muse_text_showable(const char *text, char *buf, size_t cap);

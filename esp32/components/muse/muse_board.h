@@ -68,7 +68,14 @@ typedef struct {
     muse_button_hint_t aux_hint;    /* power or menu icon; left out, there's none */
     int frame_ms;           /* face animation period */
     int avatar_px;          /* optional avatar canvas size; 0 uses the UI default */
+    /* A panel larger than width x height (the Tab5): the UI takes that box at
+     * ui_x, ui_y and muse_dock fills the rest with status, chat and controls. */
+    int ui_x, ui_y;
 
+    /* Powers a radio co-processor (the Tab5's ESP32-C6). Runs from app_main,
+     * before Home Link starts Wi-Fi and BLE and before init. NULL: the radio
+     * is on the chip. */
+    esp_err_t (*radio_init)(void);
     /* Power rails, buses, expanders. Runs first. */
     esp_err_t (*init)(void);
 
@@ -96,6 +103,16 @@ typedef struct {
      * buttons needn't be polled. NULL: polled. */
     void (*wait_buttons)(int timeout_ms);
     esp_err_t (*read_power)(muse_power_t *out);
+    /* Optional, for muse_dock: turns the picture 180 degrees (kept across
+     * restarts), and whether an external keyboard answers. */
+    void (*flip_display)(void);
+    bool (*keyboard_present)(void);
+    /* Optional, for muse_dock: the owner's camera switch (kept across
+     * restarts). Off, camera.capture is refused. */
+    bool (*camera_enabled)(void);
+    void (*set_camera_enabled)(bool on);
+    /* While a photo is being taken and briefly after: the dock shows it. */
+    bool (*camera_in_use)(void);
     /* Turns the board off; returns only on failure. */
     esp_err_t (*power_off)(void);
 } muse_board_t;
@@ -105,6 +122,10 @@ extern const muse_board_t *muse_board;
 
 /* Starts everything and returns; Home Link's app_main() calls it. */
 void muse_app_run(const muse_board_t *board);
+
+/* From any task: button edges as if poll_buttons() had returned them, for an
+ * on-screen talk button or a keyboard's talk key. */
+void muse_input_post_buttons(unsigned edges);
 
 /* The board selected by CONFIG_MUSE_BOARD_* (boards/). */
 const muse_board_t *muse_board_get(void);

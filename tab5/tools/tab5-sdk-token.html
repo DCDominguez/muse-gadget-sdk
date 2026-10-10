@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Offline by design: no network requests of any kind are allowed from this page. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tab5 SDK Key</title>
+<style>
+  :root { --bg:#f7f6fb; --card:#fff; --text:#1d1830; --dim:#635d7a; --accent:#6d4ed6; --ok:#13795b; --bad:#b42318; --line:#ddd8ee; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e0b1c; --card:#1a1530; --text:#f2efff; --dim:#8b84a8; --accent:#a77dff; --ok:#6ff0bf; --bad:#ff7a7a; --line:#2e2552; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:560px; margin:48px auto; padding:0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  p { color:var(--dim); margin:0 0 16px; }
+  label { display:block; font-weight:600; margin-bottom:6px; }
+  .row { display:flex; gap:8px; }
+  input { flex:1; min-width:0; font:15px ui-monospace, Consolas, monospace; padding:12px; border-radius:10px;
+          border:1px solid var(--line); background:var(--bg); color:var(--text); }
+  button { font:inherit; font-weight:600; padding:12px 16px; border-radius:10px; border:0; cursor:pointer; }
+  .ghost { background:transparent; color:var(--dim); border:1px solid var(--line); }
+  .primary { background:var(--accent); color:#fff; width:100%; margin-top:16px; }
+  .primary:disabled { opacity:.45; cursor:not-allowed; }
+  #msg { min-height:24px; margin-top:12px; font-size:14px; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  ol { color:var(--dim); padding-left:20px; margin:16px 0 0; font-size:14px; }
+  code { font-family:ui-monospace, Consolas, monospace; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>Muse SDK key for the Tab5</h1>
+    <p>This page runs only on your computer. It can't send anything anywhere; it saves your key as a file for the flash script, which deletes it after use.</p>
+    <label for="key">SDK token from gadgets.muse.ai → Account → SDK tokens</label>
+    <div class="row">
+      <input id="key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="mgst_…">
+      <button class="ghost" id="show" type="button">Show</button>
+    </div>
+    <div id="msg"></div>
+    <button class="primary" id="save" type="button" disabled>Save tab5-sdk-token.txt</button>
+    <label for="elk" style="margin-top:24px">Optional, for spoken replies: ElevenLabs API key (elevenlabs.io → Developers → API keys, with Text to Speech)</label>
+    <div class="row">
+      <input id="elk" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk_…">
+    </div>
+    <div id="elkmsg"></div>
+    <button class="primary" id="saveelk" type="button" disabled>Save tab5-elevenlabs-key.txt</button>
+    <ol>
+      <li>Save the file into the kit folder (next to <code>tab5-flash.ps1</code>), or leave it in Downloads.</li>
+      <li>Run the flash (or let Codex run it). The script reads the file, flashes, then deletes it.</li>
+      <li>Close this tab.</li>
+    </ol>
+  </div>
+</main>
+<script>
+  const key = document.getElementById('key'), msg = document.getElementById('msg'), save = document.getElementById('save');
+  const RE = /^mgst_[A-Za-z0-9_-]*[AEIMQUYcgkosw048]$/;
+  function check() {
+    const v = key.value.trim();
+    const ok = v.length === 48 && RE.test(v);
+    save.disabled = !ok;
+    msg.className = v ? (ok ? 'ok' : 'bad') : '';
+    msg.textContent = !v ? '' : ok ? 'Looks like a valid SDK token.' :
+      'Not a valid SDK token: it is 48 characters and starts with mgst_. Copy it again.';
+  }
+  key.addEventListener('input', check);
+  const elk = document.getElementById('elk'), elkmsg = document.getElementById('elkmsg'), saveelk = document.getElementById('saveelk');
+  const KRE = /^[A-Za-z0-9_-]{20,63}$/;
+  elk.addEventListener('input', () => {
+    const v = elk.value.trim(), ok = KRE.test(v);
+    saveelk.disabled = !ok;
+    elkmsg.className = v ? (ok ? 'ok' : 'bad') : '';
+    elkmsg.textContent = !v ? '' : ok ? 'Looks like an API key.' : 'That doesn\'t look like an ElevenLabs API key.';
+  });
+  saveelk.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([elk.value.trim() + '\n'], { type: 'text/plain' }));
+    a.download = 'tab5-elevenlabs-key.txt';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    elk.value = ''; saveelk.disabled = true;
+    elkmsg.className = 'ok'; elkmsg.textContent = 'Saved. The field is cleared.';
+  });
+  document.getElementById('show').addEventListener('click', e => {
+    key.type = key.type === 'password' ? 'text' : 'password';
+    e.target.textContent = key.type === 'password' ? 'Show' : 'Hide';
+  });
+  save.addEventListener('click', () => {
+    const blob = new Blob([key.value.trim() + '\n'], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'tab5-sdk-token.txt';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    key.value = ''; check();
+    msg.className = 'ok';
+    msg.textContent = 'Saved. The field is cleared; you can close this tab.';
+  });
+</script>
+</body>
+</html>

@@ -17,7 +17,11 @@
 #include "sim_services.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#include "muse_board.h"
+#include "muse_state.h"
 
 #include "muse_console.h"
 #include "muse_menu.h"
@@ -237,4 +241,71 @@ void muse_console_write(const void *buf, size_t n)
         (void)fwrite(buf, 1, n, stdout);
         (void)fflush(stdout);
     }
+}
+
+/* ---- muse_dock (the Tab5 profile) ---------------------------------------- */
+
+static int s_volume = 30;
+static muse_hatch_console_hook_t s_console_hook;
+
+int muse_settings_volume(void)
+{
+    return s_volume;
+}
+
+void muse_settings_set_volume(int pct)
+{
+    s_volume = pct < 0 ? 0 : pct > 100 ? 100 : pct;
+}
+
+void muse_audio_set_volume(int volume)
+{
+    (void)volume;
+}
+
+void muse_voice_request_chirp(void)
+{
+}
+
+const char *muse_link_state_name(muse_link_state_t state)
+{
+    static const char *const names[] = {
+        "starting", "unpaired", "pairing", "confirm on device", "connecting", "online", "offline", "error",
+    };
+    return (unsigned)state < sizeof(names) / sizeof(names[0]) ? names[state] : "?";
+}
+
+void muse_input_post_buttons(unsigned edges)
+{
+    /* Talk drives the face the way a voice turn would; aux is the sleep key. */
+    if (edges & MUSE_BTN_TALK_PRESS) {
+        muse_state_set_mode(MUSE_MODE_LISTENING);
+    }
+    if (edges & MUSE_BTN_TALK_RELEASE) {
+        muse_state_set_mode(MUSE_MODE_THINKING);
+    }
+    if ((edges & MUSE_BTN_AUX_PRESS) && (edges & MUSE_BTN_AUX_RELEASE)) {
+        muse_state_set_asleep(!muse_state_asleep());
+    }
+}
+
+void muse_hatch_set_console_hook(muse_hatch_console_hook_t hook)
+{
+    s_console_hook = hook;
+}
+
+/* A typed turn answers at once, through the hook, as the chat client would. */
+void muse_hatch_text_turn(char *text)
+{
+    if (s_console_hook) {
+        char reply[160];
+        snprintf(reply, sizeof(reply), "You typed \"%.100s\". (Simulated reply.)", text);
+        s_console_hook("sent", NULL, "\"bytes\":1");
+        s_console_hook("busy", NULL, "\"on\":true");
+        s_console_hook("text", reply, "\"msg\":0");
+        s_console_hook("message_done", NULL, "\"msg\":0");
+        s_console_hook("busy", NULL, "\"on\":false");
+        s_console_hook("done", NULL, "\"messages\":1,\"complete\":true");
+    }
+    free(text);
 }

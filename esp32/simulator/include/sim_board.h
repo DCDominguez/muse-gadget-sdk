@@ -22,3 +22,11 @@
 /* The desktop board profile and the SDL display it creates. */
 const muse_board_t *sim_board_get(void);
 lv_display_t *sim_board_display(void);
+/* Before muse_ui_start(): "watcher" (default, 412x412) or "tab5" (1280x720
+ * with an 800x480 Muse and muse_dock). False for an unknown name. */
+bool sim_board_select(const char *name);
+/* The Tab5 profile's external keyboard, as muse_dock sees it. */
+void sim_board_set_keyboard(bool present);
+bool sim_board_flipped(void);
+/* A scripted touch at x, y, pressed or released. */
+void sim_board_tap(int x, int y, bool down);

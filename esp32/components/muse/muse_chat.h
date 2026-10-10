@@ -87,6 +87,12 @@ void muse_hatch_turn_end(void);
 /* Abandons the turn (tap, or barge-in during the reply). */
 void muse_hatch_turn_cancel(void);
 
+/* A push (an assistant message with no turn waiting for it) has opened a
+ * reply-only turn: true once, then play it with muse_hatch_turn_event/_read
+ * like any reply. A press that starts a turn drops it (muse_hatch_push_drop). */
+bool muse_hatch_push_take(void);
+void muse_hatch_push_drop(void);
+
 typedef enum {
     MUSE_HATCH_EV_NONE,
     MUSE_HATCH_EV_HEARD,    /* transcript so far (partial while talking, then final) */
@@ -139,6 +145,11 @@ void muse_hatch_text_cancel(void);
  */
 void muse_hatch_console(const char *type, const char *text, const char *fields, ...)
     __attribute__((format(printf, 3, 4)));
+/* Also hands each muse_hatch_console() call to `hook` (NULL to stop), from
+ * the task making it: its type, its text unescaped (or NULL) and its fields
+ * as formatted (or ""). muse_dock shows typed turns on screen with it. */
+typedef void (*muse_hatch_console_hook_t)(const char *type, const char *text, const char *fields);
+void muse_hatch_set_console_hook(muse_hatch_console_hook_t hook);
 /* Undoes the escapes in a line typed at the console (\n \r \t \\) in place; returns the length. */
 size_t muse_hatch_unescape(char *s);
 

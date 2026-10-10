@@ -1,0 +1,5 @@
+wifi=connected
+link=online
+battery=57
+keyboard=false
+advance=400

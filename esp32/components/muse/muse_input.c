@@ -15,6 +15,7 @@
  */
 
 #include "muse_input.h"
+#include "muse_dock.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -35,9 +36,11 @@
 #include "muse_board.h"
 #include "muse_chat.h"
 #include "muse_console.h"
+#include "muse_imu.h"
 #include "muse_link.h"
 #include "muse_mem.h"
 #include "muse_menu.h"
+#include "muse_pixel.h"
 #include "muse_settings.h"
 #include "muse_state.h"
 #include "muse_ui.h"
@@ -62,6 +65,7 @@ static const char *TAG = "muse_input";
 #define HINT_TICKS 60          /* 0.6 s: warn that holding powers off */
 #define LONG_TICKS 150         /* 1.5 s: power off */
 #define SLEEP_CHECK_MS 100
+#define DIZZY_COOLDOWN_MS 6000 /* from one shake reaction to the next */
 
 #define SERIAL_RX 1024         /* the driver drops what doesn't fit, so a console line must */
 #define SERIAL_LINE 1024
@@ -69,6 +73,8 @@ static const char *TAG = "muse_input";
 
 static QueueHandle_t s_queue;
 static TaskHandle_t s_input;
+/* Edges posted by muse_input_post_buttons(), taken by the next poll. */
+static unsigned s_posted;
 static bool s_talk_down;
 static bool s_cpu_low;      /* display stopped and the CPU allowed to sleep */
 static volatile bool s_power_off_requested;
@@ -292,22 +298,103 @@ static void keyboard_buttons(unsigned ev)
     else if (ev & MUSE_BTN_ENTER) muse_menu_key(MUSE_MENU_SELECT);
 }
 
-/* A pairing prompt wakes the screen and keeps it on; otherwise idle sleeps. */
-static void check_sleep(void)
+/* While drowsing, snores start this far through (muse_state_sleepy()). */
+static const float SNORE_AT[] = { 0.6f, 0.8f };
+
+static bool pairing_prompt(void)
 {
     muse_ble_status_t ble;
     muse_ble_status(&ble);
-    bool prompt = ble.passkey || muse_link_state() == MUSE_LINK_CONFIRM;
-    if (prompt) {
+    return ble.passkey || muse_link_state() == MUSE_LINK_CONFIRM;
+}
+
+/*
+ * A pairing prompt wakes the screen and keeps it on; otherwise idle sleeps.
+ * The last MUSE_SLEEPY_S before that Muse drowses (the avatar nods off, with
+ * a snore or two) and only then does the screen go dark. Anything that pokes
+ * meanwhile wakes Muse back up (muse_state.h).
+ */
+static void check_sleep(void)
+{
+    static bool drowsing;
+    static int snores;
+    if (pairing_prompt()) {
+        muse_state_end_drowsing();
         set_asleep(false, "pairing");
         return;
     }
+    if (muse_state_asleep()) {
+        drowsing = false;
+        return;
+    }
+    float sleepy = muse_state_sleepy();
+    if (drowsing && sleepy == 0) {
+        ESP_LOGI(TAG, "drowsing interrupted");
+        drowsing = false;
+    }
     int after = muse_settings_sleep_s();
     float mode_t;
-    if (after && !muse_state_asleep() && muse_state_mode(&mode_t) == MUSE_MODE_IDLE
-        && muse_state_idle_secs() > after) {
+    if (!after || muse_state_mode(&mode_t) != MUSE_MODE_IDLE) {
+        if (sleepy > 0) {
+            muse_state_end_drowsing();
+        }
+        drowsing = false;
+        return;
+    }
+    if (!drowsing) {
+        float drowse_after = after > MUSE_SLEEPY_S ? after - MUSE_SLEEPY_S : 0;
+        if (muse_state_start_drowsing(drowse_after)) {
+            ESP_LOGI(TAG, "drowsing: sleeping in %.0f s", (double)MUSE_SLEEPY_S);
+            drowsing = true;
+            snores = 0;
+        }
+        return;
+    }
+    if (snores < (int)(sizeof(SNORE_AT) / sizeof(SNORE_AT[0])) && sleepy >= SNORE_AT[snores]) {
+        snores++;
+        if (muse_settings_speaker_on()) {
+            ESP_LOGI(TAG, "snore %d", snores);
+            muse_voice_request_snore();
+        }
+    }
+    if (sleepy >= 1) {
+        drowsing = false;
         set_asleep(true, "auto-sleep");
     }
+}
+
+/*
+ * Shaken: asleep, it only wakes the screen, as a tap does. Awake and idle,
+ * with nothing over the face that matters more (the menu, a pairing prompt),
+ * Muse gets dizzy. The IMU is read every MUSE_IMU_POLL_MS, not while the
+ * display is paused (on battery, asleep), when this task barely runs.
+ */
+static void check_shake(TickType_t now)
+{
+    static TickType_t dizzy_at;
+    static bool dizzied;
+    if (!muse_imu_poll_shake()) {
+        return;
+    }
+    if (muse_state_asleep()) {
+        set_asleep(false, "shake");
+        return;
+    }
+    float mode_t;
+    const char *busy = muse_state_mode(&mode_t) != MUSE_MODE_IDLE ? "busy"
+                       : muse_menu_is_open()                       ? "menu open"
+                       : pairing_prompt()                          ? "pairing"
+                       : dizzied && now - dizzy_at < pdMS_TO_TICKS(DIZZY_COOLDOWN_MS) ? "still dizzy"
+                                                                                        : NULL;
+    if (busy) {
+        ESP_LOGI(TAG, "shaken, no reaction (%s)", busy);
+        muse_state_poke();
+        return;
+    }
+    ESP_LOGI(TAG, "shaken: dizzy");
+    dizzied = true;
+    dizzy_at = now;
+    muse_state_start_dizzy();
 }
 
 static void set_cpu_low(bool low)
@@ -389,6 +476,14 @@ static bool update_wifi_nap(TickType_t now, bool paused)
     return napping;
 }
 
+void muse_input_post_buttons(unsigned edges)
+{
+    __atomic_or_fetch(&s_posted, edges, __ATOMIC_ACQ_REL);
+    if (s_input) {
+        xTaskNotifyGive(s_input);   /* out of wait_buttons() */
+    }
+}
+
 static void input_task(void *arg)
 {
     (void)arg;
@@ -396,9 +491,10 @@ static void input_task(void *arg)
     bool paused = false;
     TickType_t checked = xTaskGetTickCount() - pdMS_TO_TICKS(SLEEP_CHECK_MS);
     TickType_t powered = xTaskGetTickCount() - pdMS_TO_TICKS(POWER_MS);
+    TickType_t shook = xTaskGetTickCount();
 
     for (;;) {
-        unsigned ev = muse_board->poll_buttons();
+        unsigned ev = muse_board->poll_buttons() | __atomic_exchange_n(&s_posted, 0u, __ATOMIC_ACQ_REL);
         if (ev & (MUSE_BTN_TALK_PRESS | MUSE_BTN_TALK_RELEASE)) {
             ESP_LOGI(TAG, "talk key:%s%s", ev & MUSE_BTN_TALK_PRESS ? " press" : "",
                      ev & MUSE_BTN_TALK_RELEASE ? " release" : "");
@@ -438,6 +534,10 @@ static void input_task(void *arg)
         if (now - checked >= pdMS_TO_TICKS(SLEEP_CHECK_MS)) {
             checked = now;
             check_sleep();
+        }
+        if (!paused && now - shook >= pdMS_TO_TICKS(MUSE_IMU_POLL_MS)) {
+            shook = now;
+            check_shake(now);
         }
 
         if (now - powered >= pdMS_TO_TICKS(paused ? REST_POWER_MS : POWER_MS)) {
@@ -568,8 +668,75 @@ static void set_face(const char *name)
  * Console-only commands; false for setup commands. Their buffers are taken
  * per command: without PSRAM, static ones would hold internal RAM for good.
  */
+__attribute__((weak)) void muse_console_dump_log(void)
+{
+    printf("@log none\n");
+    fflush(stdout);
+}
+
+__attribute__((weak)) void muse_console_image(const char *url)
+{
+    (void)url;
+    printf("@img.error unsupported\n");
+    fflush(stdout);
+}
+
+__attribute__((weak)) void muse_console_camera(void)
+{
+    printf("@cam.error unsupported\n");
+    fflush(stdout);
+}
+
+__attribute__((weak)) void muse_console_wifi(void)
+{
+    printf("@wifi.error unsupported\n");
+    fflush(stdout);
+}
+
+__attribute__((weak)) void muse_console_scan(void)
+{
+    printf("@scan.error unsupported\n");
+    fflush(stdout);
+}
+
+__attribute__((weak)) void muse_console_ideas(bool clear)
+{
+    (void)clear;
+    printf("@ideas.error unsupported\n");
+    fflush(stdout);
+}
+
+/*
+ * "tts" shows the speech server, "tts=URL" sets it ("tts=" clears it) and
+ * "tts.voice=NAME" its voice ("tts.voice=" the default). A server with no
+ * path gets OpenAI's /v1/audio/speech.
+ */
+static void tts_command(const char *arg)
+{
+    bool bad = false;
+    if (arg[0] == '=') {
+        bad = !muse_settings_set_tts_url(arg + 1);
+    } else if (arg[0] == '.') {
+        bad = !muse_settings_set_tts_voice(arg + 7);
+    }
+    char url[MUSE_TTS_URL_MAX + 1];
+    char voice[MUSE_TTS_VOICE_MAX + 1];
+    muse_settings_tts_url(url);
+    muse_settings_tts_voice(voice);
+    if (bad) {
+        printf("@tts.error want tts=http://HOST:PORT (up to %d characters, no spaces) or tts= for none, "
+               "tts.voice=NAME (letters, digits, _-.+,())\n", MUSE_TTS_URL_MAX);
+    }
+    printf("@tts {\"url\":\"%s\",\"voice\":\"%s\"}\n", url, voice);
+    fflush(stdout);
+}
+
 static bool console_command(char *line, bool whole)
 {
+    if (!strcmp(line, "log")) {
+        muse_console_dump_log();
+        return true;
+    }
     if (!strcmp(line, "status")) {
         size_t cap = 1024;   /* long SSID, host and VM names escaped: past 512 */
         char *json = heap_caps_malloc(cap, MUSE_BIG_CAPS);
@@ -611,6 +778,46 @@ static bool console_command(char *line, bool whole)
         set_face(line + 5);
         return true;
     }
+    if (!strncmp(line, "img=", 4)) {
+        muse_console_image(line + 4);
+        return true;
+    }
+    if (!strcmp(line, "cam")) {
+        muse_console_camera();
+        return true;
+    }
+    if (!strcmp(line, "wifi")) {
+        muse_console_wifi();
+        return true;
+    }
+    if (!strcmp(line, "scan")) {
+        muse_console_scan();
+        return true;
+    }
+    if (!strcmp(line, "ideas") || !strcmp(line, "ideas.clear")) {
+        muse_console_ideas(line[5] == '.');
+        return true;
+    }
+    if (!strncmp(line, "dock=", 5)) {
+        if (muse_board->display_lock && muse_board->display_lock(1000)) {
+            muse_dock_command(line + 5);
+            muse_board->display_unlock();
+        }
+        return true;
+    }
+    if (!strcmp(line, "imu")) {
+        float a[3], g[3];
+        bool ok = muse_imu_last(a, g);
+        printf("@imu {\"present\":%s,\"a\":[%.2f,%.2f,%.2f],\"gravity\":[%.2f,%.2f,%.2f],\"swing_g\":%.1f}\n",
+               ok ? "true" : "false", (double)a[0], (double)a[1], (double)a[2], (double)g[0], (double)g[1],
+               (double)g[2], (double)MUSE_IMU_SWING_G);
+        fflush(stdout);
+        return true;
+    }
+    if (!strncmp(line, "tts", 3) && (!line[3] || line[3] == '=' || !strncmp(line + 3, ".voice=", 7))) {
+        tts_command(line + 3);
+        return true;
+    }
     if (strncmp(line, "chat", 4) != 0) {
         return false;
     }
@@ -639,11 +846,15 @@ static bool console_command(char *line, bool whole)
  * menu's Down / Select; 'p' sends a screenshot; 'z' / 'w' sleep and wake.
  * A line starting with '>' is a setup command, the same "key=value" text as
  * the BLE CMD characteristic, or one of the console's own: "status" prints
- * the device's state, "power" the battery meter (muse_battery.h) and
+ * the device's state, "log" the log since boot, "power" the battery meter (muse_battery.h) and
  * "power.reset" starts it over, "nap" sleeps and leaves Wi-Fi at once (as
  * two minutes asleep on battery would; 'w' rejoins), "face=" shows a face
- * (see set_face), and "chat=" sends a typed message to Hatch (see chat_line
- * and tools/muse/chat.py).
+ * (see set_face), "img=URL" draws an image as display.draw_url would,
+ * "cam" takes a photo as camera.capture would, "wifi" lists recent drops,
+ * "dock=pocket|full|demo|osk" shows the dock's states,
+ * "tts=" sets a speech server (see tts_command), and
+ * "chat=" sends a typed message to Hatch (see chat_line and
+ * tools/muse/chat.py).
  */
 static void serial_task(void *arg)
 {

@@ -1,0 +1,8 @@
+wifi=connected
+link=online
+battery=57
+keyboard=false
+advance=400
+# Tap the chat line: the on-screen keyboard opens over the bottom strip.
+tap=1000,672
+advance=300
